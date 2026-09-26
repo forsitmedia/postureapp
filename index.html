@@ -6,88 +6,81 @@
 <title>Unshrimp Tracker</title>
 <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="mode-wizard">
 
-<div class="wrap">
+<!-- camera lives here for the whole session; CSS moves it between modes -->
+<div class="videobox" id="videobox">
+  <video id="video" playsinline muted autoplay></video>
+  <canvas id="overlay"></canvas>
+  <div class="scrim" id="scrim"></div>
 
+  <div class="scorebadge" id="scorebadge" hidden>
+    <div class="scorenum" id="scorenum">--</div>
+    <div class="scorelabel" id="scorelabel">posture</div>
+  </div>
+
+  <div class="toast" id="toast" hidden></div>
+</div>
+
+<!-- ==================== WIZARD ==================== -->
+<div class="wizard" id="wizard">
+  <div class="wcard">
+    <div class="wstep" id="wstep">Step 1 of 12</div>
+    <h1 class="wtitle" id="wtitle">Unshrimp Tracker</h1>
+    <p class="wbody" id="wbody">We'll learn how you sit, what your bad habits look like, and then teach you the good one.</p>
+
+    <div class="wcue" id="wcue" hidden></div>
+
+    <div class="hold" id="holdwrap" hidden><div class="holdfill" id="holdfill"></div></div>
+
+    <div class="wframing" id="wframing" hidden>
+      <span class="chip" id="chkNose">nose</span>
+      <span class="chip" id="chkShoulders">shoulders</span>
+      <span class="chip" id="chkDist">distance</span>
+    </div>
+
+    <div class="wbtns">
+      <button class="btn primary" id="wPrimary">Start camera</button>
+      <button class="btn ghost" id="wSkip" hidden>Skip this</button>
+    </div>
+
+    <div class="wdots" id="wdots"></div>
+  </div>
+</div>
+
+<!-- ==================== LIVE DASHBOARD ==================== -->
+<div class="wrap" id="app" hidden>
   <header class="head">
     <div class="kicker">Unshrimp Tracker</div>
-    <h1>Pose lab <span class="ver">v1</span></h1>
-    <p class="sub">Camera on &rarr; calibrate your best and worst &rarr; live slouch score.</p>
+    <h1>Live <span class="ver">tracking</span></h1>
   </header>
 
   <main class="grid">
-
-    <!-- ============ STAGE ============ -->
     <section class="stage">
-      <div class="videobox" id="videobox">
-        <video id="video" playsinline muted autoplay></video>
-        <canvas id="overlay"></canvas>
-
-        <div class="scorebadge" id="scorebadge" hidden>
-          <div class="scorenum" id="scorenum">--</div>
-          <div class="scorelabel">posture</div>
-        </div>
-
-        <div class="idle" id="idle">
-          <div class="idleinner">
-            <div class="idleicon">&#127916;</div>
-            <p>Camera is off.</p>
-            <button class="btn primary" id="startBtn">Start camera</button>
-            <p class="tiny">Nothing leaves your machine. All processing is local.</p>
-          </div>
-        </div>
-
-        <div class="toast" id="toast" hidden></div>
-      </div>
+      <div class="videoslot" id="videoslot"></div>
 
       <div class="meterwrap">
         <div class="meter"><div class="meterfill" id="meterfill"></div></div>
         <div class="meterlabels">
           <span>shrimp</span>
           <span id="stateLabel">waiting</span>
-          <span>upright</span>
+          <span>ideal</span>
         </div>
       </div>
 
-      <div class="stats" id="stats">
-        <div class="stat"><div class="statnum" id="stUpright">0%</div><div class="statlab">upright</div></div>
+      <div class="stats">
+        <div class="stat"><div class="statnum" id="stUpright">0%</div><div class="statlab">good</div></div>
         <div class="stat"><div class="statnum" id="stSession">0:00</div><div class="statlab">session</div></div>
         <div class="stat"><div class="statnum" id="stAlerts">0</div><div class="statlab">alerts</div></div>
         <div class="stat"><div class="statnum" id="stStreak">0:00</div><div class="statlab">best streak</div></div>
       </div>
     </section>
 
-    <!-- ============ SIDEBAR ============ -->
     <aside class="side">
-
       <div class="panel">
-        <h2>Setup</h2>
-        <ol class="steps" id="steps">
-          <li data-step="camera"><span class="dot"></span><span class="steptext">Turn the camera on</span></li>
-          <li data-step="frame"><span class="dot"></span><span class="steptext">Get in frame &mdash; nose + both shoulders</span></li>
-          <li data-step="good"><span class="dot"></span><span class="steptext">Capture your <b>best</b> posture</span></li>
-          <li data-step="bad"><span class="dot"></span><span class="steptext">Capture your <b>worst</b> shrimp</span></li>
-          <li data-step="live"><span class="dot"></span><span class="steptext">Live scoring</span></li>
-        </ol>
-      </div>
-
-      <div class="panel" id="calibPanel" hidden>
-        <h2 id="calibTitle">Calibrate</h2>
-        <p class="hint" id="calibHint">Sit up tall. Hold it.</p>
-        <div class="hold"><div class="holdfill" id="holdfill"></div></div>
-        <div class="btnrow">
-          <button class="btn" id="skipBtn">Skip</button>
-        </div>
-      </div>
-
-      <div class="panel">
-        <h2>Framing</h2>
-        <ul class="checks">
-          <li id="chkNose"><span class="tick"></span>Nose visible</li>
-          <li id="chkShoulders"><span class="tick"></span>Both shoulders visible</li>
-          <li id="chkDist"><span class="tick"></span>Good distance from camera</li>
-        </ul>
+        <h2>What you're doing</h2>
+        <div class="diagnosis" id="diagnosis">Calibrating...</div>
+        <div class="faults" id="faults"></div>
       </div>
 
       <div class="panel">
@@ -108,21 +101,24 @@
 
       <div class="panel">
         <div class="btnrow">
+          <button class="btn" id="tutorialBtn">Show me the fix</button>
           <button class="btn" id="recalBtn">Recalibrate</button>
-          <button class="btn danger" id="resetBtn">Reset demo</button>
+          <button class="btn danger" id="resetBtn">Reset stats</button>
         </div>
       </div>
-
     </aside>
   </main>
 </div>
 
-<!-- ============ WARNING OVERLAY ============ -->
+<!-- ==================== WARNING ==================== -->
 <div class="warnwrap" id="warnwrap" hidden>
   <div class="warncard">
     <video id="warnvid" src="assets/warning.mp4" playsinline></video>
     <div class="warntext" id="warntext">I blinked and you became seafood. Fix it.</div>
-    <button class="btn primary" id="warnClose">I've unshrimped</button>
+    <div class="btnrow center">
+      <button class="btn primary" id="warnClose">I've unshrimped</button>
+      <button class="btn ghost" id="warnFix">Remind me how</button>
+    </div>
   </div>
 </div>
 
