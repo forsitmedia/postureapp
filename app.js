@@ -104,6 +104,7 @@ let landmarker=null, stepIdx=0, holdMs=0, lastT=performance.now(), lastVideoTime
 let smoothLm=null, refs={}, spread=null, scoreEMA=null, score=100;
 let sessionMs=0, uprightMs=0, alerts=0, streakMs=0, bestStreak=0;
 let badMs=0, alerting=false, cooldownMs=0, live=false, tutorialHint=0;
+let advancing=false;   // latch: stop the loop re-firing a step while it advances
 
 const HOLD = 1700, COOLDOWN = 12000;
 const step = () => STEPS[stepIdx];
@@ -239,7 +240,7 @@ function renderDots(){
 
 function showStep(){
   const s = step();
-  holdMs = 0; tutorialHint = 0;
+  holdMs = 0; tutorialHint = 0; advancing = false;
   $("wstep").textContent = `Step ${stepIdx+1} of ${STEPS.length}`;
   $("wtitle").textContent = s.title;
   $("wbody").innerHTML = s.body;
@@ -270,6 +271,7 @@ function nextStep(){
 }
 
 function capture(f, id){
+  advancing = true;
   refs[id] = {...f};
   buildSpread();
   $("wcue").classList.add("ok");
@@ -279,6 +281,7 @@ function capture(f, id){
 
 /* ==================== wizard tick ======================== */
 function wizardTick(f, ok, dt){
+  if(advancing) return;
   const s = step();
 
   if(s.kind==="frame"){
