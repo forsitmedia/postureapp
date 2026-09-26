@@ -41,9 +41,10 @@ const JEERS = [
 /* ========================= steps ========================= */
 const STEPS = [
   { id:"intro", kind:"intro",
-    title:"Unshrimp Tracker",
-    body:"We learn how you sit, record your bad habits, then teach you the good one.",
-    btn:"Start camera" },
+    title:"Sit Happens",
+    tagline:"Live posture tracking that calls you out.",
+    body:"Your webcam watches how you sit. We learn your good posture and your worst habits, then interrupt you the moment you fold. Nothing leaves your computer.",
+    btn:"Start" },
 
   { id:"frame", kind:"frame",
     title:"Let's find you",
@@ -356,7 +357,13 @@ function showStep(){
   const s = step();
   holdMs = 0; tutorialHint = 0; advancing = false; gateFailMs = 0;
   if(s.kind === 'sweep'){ sweepL = 0; sweepR = 0; }
-  $("wstep").textContent = `Step ${stepIdx+1} of ${STEPS.length}`;
+  const landing = s.kind === "intro";
+  document.querySelector(".wcard").classList.toggle("landing", landing);
+  $("wstep").hidden = landing;
+  $("wdots").hidden = landing;
+  $("wtag").hidden  = !s.tagline;
+  if(s.tagline) $("wtag").textContent = s.tagline;
+  $("wstep").textContent = `Step ${stepIdx} of ${STEPS.length-1}`;
   $("wtitle").textContent = s.title;
   $("wbody").innerHTML = s.body;
 

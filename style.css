@@ -56,6 +56,10 @@ body{
 @media (max-width:640px){ .wcard{flex-direction:column;gap:14px} .wimg{width:120px} }
 .wstep{font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--accent);font-weight:700;margin-bottom:5px}
 .wtitle{margin:0 0 5px;font-size:clamp(25px,3.3vw,36px);font-weight:800;letter-spacing:-.02em;line-height:1.1}
+.wtag{color:var(--accent);font-weight:700;font-size:clamp(16px,2vw,21px);margin:0 0 12px;letter-spacing:-.01em}
+.wcard.landing{padding:34px 30px 28px}
+.wcard.landing .wtitle{font-size:clamp(42px,7vw,72px);letter-spacing:-.035em;margin-bottom:8px}
+.wcard.landing .wbody{max-width:50ch;font-size:clamp(15px,1.6vw,17px);margin-bottom:22px}
 .wbody{color:var(--dim);font-size:clamp(16px,1.8vw,19px);margin:0 auto 10px;max-width:44ch;line-height:1.4}
 .wbody b{color:var(--txt)}
 .wcue{

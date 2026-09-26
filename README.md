@@ -1,4 +1,4 @@
-# Unshrimp Tracker
+# Sit Happens
 
 Live posture scoring in the browser. Your webcam, your machine, no uploads.
 
