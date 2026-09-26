@@ -59,9 +59,9 @@ const STEPS = [
     cue:"Closer. Exaggerate it." },
 
   { id:"down", kind:"capture", ref:"down", diff:true,
-    title:"Now slump back and down",
-    body:"Let your chin fall toward your chest and sink into the chair.",
-    cue:"Collapse. Let gravity win." },
+    title:"Now lean back and sink",
+    body:"Push away from the desk and let yourself drop into the backrest. Chin down, weight back.",
+    cue:"Lean back. Let gravity win." },
 
   { id:"left", kind:"capture", ref:"left", diff:true,
     title:"Collapse onto your left",
@@ -88,7 +88,7 @@ const STEPS = [
     body:"Let your arms fall loose, but <b>keep your chest and shoulders exactly where they are</b>.",
     cue:"Arms down. Chest stays open." },
 
-  { id:"ideal", kind:"capture", ref:"ideal",
+  { id:"ideal", kind:"capture", ref:"ideal", relaxMs:16000,
     title:"That's your position. Hold it.",
     body:"This is what we'll hold you to for the rest of the session.",
     cue:"Shoulders level, chest open, head stacked." },
@@ -243,10 +243,15 @@ const GATES = {
   },
 
   down: (f,n) => {
-    const d = (n.neck - f.neck) / Math.max(n.neck, 1e-3);   // head sinking toward shoulders
-    return d > 0.14 ? {ok:true,  hint:"Hold it there."}
-         : d > 0.06 ? {ok:false, hint:"More - let your head sink."}
-                    : {ok:false, hint:"Slump down, chin toward your chest."};
+    // Leaning back moves you away from the lens (narrower shoulders);
+    // slumping drops your head toward them. Either counts, and we take
+    // whichever signal is further along.
+    const back = 1 - f.size / n.size;
+    const sink = (n.neck - f.neck) / Math.max(n.neck, 1e-3);
+    const amt  = Math.max(back / 0.085, sink / 0.13);
+    return amt >= 1   ? {ok:true,  hint:"Hold it there."}
+         : amt >  0.4 ? {ok:false, hint:"Keep going - further back."}
+                      : {ok:false, hint:"Push back off the desk and sink into the chair."};
   },
 
   left: (f,n) => {
@@ -263,10 +268,18 @@ const GATES = {
                      : {ok:false, hint:"Drop your RIGHT shoulder."};
   },
 
-  ideal: (f,n) => {
-    if(f.neck < n.neck * 0.99) return {ok:false, hint:"Lift your chest - sit taller than your normal slouch."};
-    if(Math.abs(f.tilt) > 0.075) return {ok:false, hint:"Level your shoulders."};
-    return {ok:true, hint:"That's the one. Hold it."};
+  // The target everything else is scored against, so this one is strict:
+  // it must be measurably better than the normal sit on every axis.
+  ideal: (f,n,mo) => {
+    if(mo > 0.075)              return {ok:false, hint:"Hold still while we lock it in."};
+    if(f.size > n.size * 1.06)  return {ok:false, hint:"Sit back - you are leaning into the screen."};
+    if(f.size < n.size * 0.90)  return {ok:false, hint:"Come forward - you are slumped back."};
+    if(f.neck < n.neck * 1.05)  return {ok:false, hint:"Sit taller - lift your chest and lengthen your neck."};
+    if(Math.abs(f.tilt) > 0.05) return {ok:false, hint: f.tilt > 0
+                                          ? "Lift your LEFT shoulder - you are tipped over."
+                                          : "Lift your RIGHT shoulder - you are tipped over."};
+    if(Math.abs(f.off) > 0.11)  return {ok:false, hint:"Centre your head over your shoulders."};
+    return {ok:true, hint:"That is the one. Hold it."};
   }
 };
 
@@ -352,7 +365,7 @@ function wizardTick(f, ok, dt){
 
     // never let a fussy gate strand someone mid-demo
     if(!g.ok && ok && f){ gateFailMs += dt; } else if(g.ok){ gateFailMs = 0; }
-    const relaxed = gateFailMs > 9000;
+    const relaxed = gateFailMs > (s.relaxMs || 9000);
 
     const pass = ok && !!f && (g.ok || relaxed);
 
