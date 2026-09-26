@@ -225,7 +225,5 @@ h1 .ver{color:var(--dim);font-weight:500}
   font-variant-numeric:tabular-nums;color:var(--good);letter-spacing:-.03em}
 
 /* ================= logo ================= */
-.logo{width:74px;height:74px;border-radius:16px;display:block;margin-bottom:10px}
-.wcard.landing .logo{width:86px;height:86px}
 .kicker{display:flex;align-items:center;gap:9px}
 .kickerlogo{width:26px;height:26px;border-radius:7px;display:block}

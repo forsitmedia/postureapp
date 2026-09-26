@@ -391,7 +391,6 @@ function showStep(){
   $("wizard").classList.toggle("center", landing);
   $("wstep").hidden = landing;
   $("wdots").hidden = landing;
-  $("logo").hidden  = !landing;
   $("hero").hidden  = !landing;
   $("scale").hidden = !landing;
   if(landing && !$("scale").dataset.built){
@@ -659,6 +658,7 @@ function showNag(){
   el.hidden = false;
   placeNag();
 
+  warnVid.loop = true;              // runs until the score recovers, not until the clip ends
   warnVid.currentTime = 0;
   warnVid.muted = !$("soundOn").checked;
   warnVid.volume = 1;
