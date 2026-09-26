@@ -742,8 +742,11 @@ function fmtClock(ms){
 }
 
 /* ========================= loop ========================== */
-function loop(){
-  requestAnimationFrame(loop);
+/* The browser suspends requestAnimationFrame while the tab is in the
+   background, which stopped tracking the moment the user switched tabs.
+   A worker's timer is not throttled that way, so it drives the same
+   step while hidden and rAF drives it while visible. */
+function tick(){
   if(!landmarker || video.readyState < 2) return;
 
   // Only advance the clock on frames we actually process. The camera
@@ -850,6 +853,28 @@ function loop(){
 
   draw(smoothLm, col, !live && step().kind==="tutorial" ? FOCUS[step().check] : null);
 }
+function loop(){
+  requestAnimationFrame(loop);
+  if(!document.hidden) tick();
+}
+
+/* a clock that keeps running when the tab is not on screen */
+let bgWorker = null;
+function startBackgroundClock(){
+  if(bgWorker) return;
+  try{
+    const src = "let id=null;onmessage=e=>{if(e.data==='start'){if(!id)id=setInterval(()=>postMessage(0),100);}" +
+                "else{clearInterval(id);id=null;}};";
+    bgWorker = new Worker(URL.createObjectURL(new Blob([src], {type:"text/javascript"})));
+    bgWorker.onmessage = () => { if(document.hidden) tick(); };
+    bgWorker.postMessage("start");
+  }catch(e){ /* no worker: tracking simply pauses in the background as before */ }
+}
+
+document.addEventListener("visibilitychange", ()=>{
+  lastT = performance.now();      // do not bill the gap to the user
+});
+
 function fmt(ms){ const s=Math.floor(ms/1000); return `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`; }
 
 /* ========================= start ========================= */
@@ -877,7 +902,7 @@ async function startCamera(){
     $("wbody").innerHTML = `Could not load the pose model: <b>${e.message}</b>`;
     return;
   }
-  resize(); lastT = performance.now(); nextStep(); loop();
+  resize(); lastT = performance.now(); nextStep(); loop(); startBackgroundClock();
 }
 
 /* ======================== controls ======================= */
