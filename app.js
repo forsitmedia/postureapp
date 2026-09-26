@@ -59,7 +59,7 @@ const STEPS = [
     body:"Look over one shoulder, then the other, like you would to talk to someone. We learn your range so turning your head never counts against you.",
     cue:"Turn all the way to one side, then the other." },
 
-  { id:"close", kind:"capture", ref:"close", diff:true, anchor:"top",
+  { id:"close", kind:"capture", ref:"close", diff:true,
     title:"Now lean into the screen",
     body:"Push your head and chest toward the monitor, like you're reading something tiny.",
     cue:"Closer. Exaggerate it." },
@@ -69,12 +69,12 @@ const STEPS = [
     body:"Push away from the desk and let yourself drop into the backrest. Chin down, weight back.",
     cue:"Lean back. Let gravity win." },
 
-  { id:"left", kind:"capture", ref:"left", diff:true, anchor:"top",
+  { id:"left", kind:"capture", ref:"left", diff:true,
     title:"Collapse onto your left",
     body:"Drop your left shoulder and lean your weight onto that side.",
     cue:"Left shoulder down." },
 
-  { id:"right", kind:"capture", ref:"right", diff:true, anchor:"top",
+  { id:"right", kind:"capture", ref:"right", diff:true,
     title:"Now the other side",
     body:"Same thing, mirrored. Drop your right shoulder and lean right.",
     cue:"Right shoulder down." },
