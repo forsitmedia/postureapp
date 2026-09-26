@@ -107,7 +107,7 @@ let badMs=0, alerting=false, cooldownMs=0, live=false, tutorialHint=0;
 let advancing=false;   // latch: stop the loop re-firing a step while it advances
 let goodMs=0, nagMoveMs=0, lastNagPos=null;
 
-const HOLD = 1700, COOLDOWN = 2500;   // short re-arm; the nag clears itself on recovery
+const HOLD = 1700, COOLDOWN = 1200;   // short re-arm; the nag clears itself on recovery
 const RECOVER_MS = 600;               // how long you must look good before it lets go
 const step = () => STEPS[stepIdx];
 
@@ -418,10 +418,14 @@ function loop(){
   requestAnimationFrame(loop);
   if(!landmarker || video.readyState < 2) return;
 
-  const now = performance.now();
-  const dt = Math.min(now-lastT, 100); lastT = now;
+  // Only advance the clock on frames we actually process. The camera
+  // runs slower than the display, so charging dt on every animation
+  // frame made every timer accrue at roughly half real speed.
   if(video.currentTime === lastVideoTime) return;
   lastVideoTime = video.currentTime;
+
+  const now = performance.now();
+  const dt = Math.min(now-lastT, 100); lastT = now;
 
   const lm = landmarker.detectForVideo(video, now)?.landmarks?.[0] || null;
 
@@ -443,7 +447,10 @@ function loop(){
     if(step().kind==="tutorial" && f) col = CHECKS[step().check](f) ? "#3ddc97" : "#ff7a2f";
   } else if(f && ok){
     const raw = computeScore(f);
-    scoreEMA = scoreEMA===null ? raw : scoreEMA + (raw-scoreEMA)*0.16;
+    // Fall fast so the grace period starts the instant you slump; rise
+    // gently so recovery stays as steady as it already feels.
+    const a = raw < scoreEMA ? 0.45 : 0.16;
+    scoreEMA = scoreEMA===null ? raw : scoreEMA + (raw-scoreEMA)*a;
     score = scoreEMA;
 
     const th = +$("thresh").value, graceMs = +$("grace").value*1000;
@@ -471,10 +478,10 @@ function loop(){
         nagMoveMs += dt;
         if(nagMoveMs > 7000){ nagMoveMs = 0; placeNag(); }   // keep moving if ignored
       }
-    } else if(!good && cooldownMs <= 0){
-      badMs += dt;
-      if(badMs >= graceMs) showNag();
-    } else if(good){ badMs = 0; }
+    } else if(!good){
+      badMs += dt;                                      // counts during re-arm too
+      if(badMs >= graceMs && cooldownMs <= 0) showNag();
+    } else { badMs = 0; }
 
     $("scorenum").textContent = Math.round(score);
     $("scorenum").style.color = col;
