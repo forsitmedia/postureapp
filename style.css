@@ -35,6 +35,7 @@ body{
 
 /* ================= wizard ================= */
 .wizard{position:fixed;inset:0;z-index:20;display:flex;align-items:flex-end;justify-content:center;
+  transition:align-items .3s;
   padding:24px 24px max(24px, env(safe-area-inset-bottom, 0px));pointer-events:none}
 .wcard{
   width:min(900px,100%);text-align:center;pointer-events:auto;
@@ -80,6 +81,9 @@ body{
 .wdots i{width:6px;height:6px;border-radius:99px;background:var(--line);transition:.3s}
 .wdots i.done{background:var(--good)}
 .wdots i.now{background:var(--accent);width:20px}
+
+/* steps where the user moves their body need the frame, not the caption */
+.wizard.top{align-items:flex-start;padding-top:max(20px, env(safe-area-inset-top, 0px))}
 
 /* ================= dashboard ================= */
 .wrap{max-width:1280px;margin:0 auto;padding:28px 20px 60px;position:relative;z-index:2}

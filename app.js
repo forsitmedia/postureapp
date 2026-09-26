@@ -54,22 +54,27 @@ const STEPS = [
     body:"Don't correct anything. Slouch if you slouch. This is the baseline we compare against.",
     cue:"Be honest. Hold still." },
 
-  { id:"close", kind:"capture", ref:"close", diff:true,
+  { id:"turn", kind:"sweep",
+    title:"Now turn your head left, then right",
+    body:"Look over one shoulder, then the other, like you would to talk to someone. We learn your range so turning your head never counts against you.",
+    cue:"Turn all the way to one side, then the other." },
+
+  { id:"close", kind:"capture", ref:"close", diff:true, anchor:"top",
     title:"Now lean into the screen",
     body:"Push your head and chest toward the monitor, like you're reading something tiny.",
     cue:"Closer. Exaggerate it." },
 
-  { id:"down", kind:"capture", ref:"down", diff:true,
+  { id:"down", kind:"capture", ref:"down", diff:true, anchor:"top",
     title:"Now lean back and sink",
     body:"Push away from the desk and let yourself drop into the backrest. Chin down, weight back.",
     cue:"Lean back. Let gravity win." },
 
-  { id:"left", kind:"capture", ref:"left", diff:true,
+  { id:"left", kind:"capture", ref:"left", diff:true, anchor:"top",
     title:"Collapse onto your left",
     body:"Drop your left shoulder and lean your weight onto that side.",
     cue:"Left shoulder down." },
 
-  { id:"right", kind:"capture", ref:"right", diff:true,
+  { id:"right", kind:"capture", ref:"right", diff:true, anchor:"top",
     title:"Now the other side",
     body:"Same thing, mirrored. Drop your right shoulder and lean right.",
     cue:"Right shoulder down." },
@@ -110,6 +115,7 @@ let advancing=false;   // latch: stop the loop re-firing a step while it advance
 let goodMs=0, nagMoveMs=0, lastNagPos=null;
 let prevFeat=null, motionEMA=0, gateFailMs=0;
 let teaching=false, teachMs=0;
+let turnRange=0, sweepL=0, sweepR=0;
 let pipWin=null, pipEls=null;
 
 const HOLD = 2400, COOLDOWN = 1200;   // short re-arm; the nag clears itself on recovery
@@ -139,6 +145,16 @@ function features(lm){
 }
 
 /* ======================== scoring ======================== */
+/* Turning your head swings the nose away from the shoulder midpoint,
+   which otherwise reads exactly like a head drifting off centre. We
+   learn the user's own turning range and ignore sideways head movement
+   inside it, so looking at a colleague is not a posture fault. */
+function deadzone(f){
+  if(!refs.ideal || turnRange <= 0) return f;
+  const d = f.off - refs.ideal.off;
+  const past = Math.sign(d) * Math.max(0, Math.abs(d) - turnRange);
+  return {...f, off: refs.ideal.off + past};
+}
 function buildSpread(){
   spread = {};
   for(const d of DIMS){
@@ -155,7 +171,7 @@ const dot   = (a,b) => a.reduce((s,x,i)=>s+x*b[i],0);
 function faultAmounts(f){
   const out = {};
   if(!refs.ideal) return out;
-  const cur = delta(f, refs.ideal);
+  const cur = delta(deadzone(f), refs.ideal);
   for(const k of Object.keys(BAD_LABELS)){
     if(!refs[k]){ out[k]=0; continue; }
     const axis = delta(refs[k], refs.ideal);
@@ -167,6 +183,7 @@ function faultAmounts(f){
 
 function computeScore(f){
   if(!refs.ideal || !spread) return 100;
+  f = deadzone(f);
   const d = norm(delta(f, refs.ideal));
   const bads = Object.keys(BAD_LABELS).filter(k=>refs[k]);
   // typical distance from ideal to a bad pose = the scale of "fully wrong"
@@ -339,6 +356,7 @@ function renderDots(){
 function showStep(){
   const s = step();
   holdMs = 0; tutorialHint = 0; advancing = false; gateFailMs = 0;
+  if(s.kind === 'sweep'){ sweepL = 0; sweepR = 0; }
   $("wstep").textContent = `Step ${stepIdx+1} of ${STEPS.length}`;
   $("wtitle").textContent = s.title;
   $("wbody").innerHTML = s.body;
@@ -352,13 +370,14 @@ function showStep(){
   $("wcue").hidden = !s.cue || teaching;
   if(s.cue){ $("wcue").textContent = s.cue; $("wcue").classList.remove("ok"); }
 
+  $("wizard").classList.toggle("top", s.anchor === "top");
   teaching = !!s.teach; teachMs = 0;
   document.querySelector(".wcard").classList.toggle("teaching", teaching);
 
-  const needsHold = (s.kind==="capture" || s.kind==="tutorial") && !teaching;
+  const needsHold = (s.kind==="capture" || s.kind==="tutorial" || s.kind==="sweep") && !teaching;
   $("holdwrap").hidden = !needsHold;
   $("holdfill").style.width = "0%";
-  $("wframing").hidden = teaching || !(s.kind==="frame" || s.kind==="capture");
+  $("wframing").hidden = teaching || !(s.kind==="frame" || s.kind==="capture" || s.kind==="sweep");
 
   $("wPrimary").hidden = !s.btn;
   if(s.btn) $("wPrimary").textContent = s.btn;
@@ -404,7 +423,7 @@ function wizardTick(f, ok, dt){
       document.querySelector(".wcard").classList.remove("teaching");
       $("holdwrap").hidden = false;
       $("wcue").hidden = !s.cue;
-      $("wframing").hidden = !(s.kind==="frame" || s.kind==="capture");
+      $("wframing").hidden = !(s.kind==="frame" || s.kind==="capture" || s.kind==="sweep");
       holdMs = 0; gateFailMs = 0;
     }
     return;
@@ -413,6 +432,37 @@ function wizardTick(f, ok, dt){
   if(s.kind==="frame"){
     if(ok){ holdMs += dt; if(holdMs > 700) nextStep(); }
     else holdMs = 0;
+    return;
+  }
+
+  if(s.kind==="sweep"){
+    const base = refs.normal ? refs.normal.off : 0;
+    if(f && ok){
+      sweepL = Math.max(sweepL, f.off - base);
+      sweepR = Math.max(sweepR, base - f.off);
+    }
+    const NEED = 0.13;
+    const lOk = sweepL >= NEED, rOk = sweepR >= NEED;
+    $("wmetric").hidden = false;
+    $("wmetric").textContent =
+      "one way " + (lOk ? "done" : Math.round(clamp(sweepL/NEED,0,1)*100) + "%") +
+      "   other way " + (rOk ? "done" : Math.round(clamp(sweepR/NEED,0,1)*100) + "%");
+    $("holdfill").style.width =
+      clamp((Math.min(sweepL,NEED)+Math.min(sweepR,NEED))/(2*NEED),0,1)*100 + "%";
+    $("holdfill").classList.toggle("ready", lOk && rOk);
+    $("wcue").classList.toggle("ok", lOk && rOk);
+    $("wcue").textContent = (lOk && rOk) ? "Got your range."
+      : (lOk || rOk) ? "Good - now the other way."
+      : s.cue;
+
+    gateFailMs += dt;
+    if((lOk && rOk) || gateFailMs > 14000){
+      turnRange = clamp(Math.max(sweepL, sweepR) * 0.9, 0.08, 0.35);
+      advancing = true;
+      $("wcue").classList.add("ok");
+      $("wcue").textContent = "Got your range.";
+      setTimeout(nextStep, 420);
+    }
     return;
   }
 
@@ -754,6 +804,7 @@ $("wSkip").addEventListener("click", ()=>{
 $("tutorialBtn").addEventListener("click", ()=> backToWizard(STEPS.findIndex(s=>s.id==="t1")));
 $("recalBtn").addEventListener("click", ()=>{
   refs = {}; spread = null; scoreEMA = null; armBase = null;
+  turnRange = 0; sweepL = 0; sweepR = 0;
   backToWizard(STEPS.findIndex(s=>s.id==="normal"));
 });
 $("resetBtn").addEventListener("click", ()=>{
