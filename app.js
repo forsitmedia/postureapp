@@ -484,6 +484,7 @@ function goLive(){
 function backToWizard(fromIdx){
   live = false;
   if(alerting) hideNag();
+  closePip();
   const box = $("videobox");
   box.classList.add("fullscreen");
   document.body.appendChild(box);
@@ -504,68 +505,55 @@ function renderFaults(am, worst){
 }
 
 /* ==================== floating window =====================
-   A normal page cannot paint outside its own tab, so the nag can
-   only cover this page. Document Picture-in-Picture opens a real
-   OS window that floats above every other app, and we mirror the
-   score and the warning video into it. Needs a user gesture to
-   open, so it is tied to a button, and everything degrades to the
-   in-page nag where the API is missing.
+   Document Picture-in-Picture is the only way a page can put
+   anything above other applications. Two limits shape this:
+   the browser owns the window's position, so it cannot be moved
+   around the screen, and opening one normally wants a user
+   gesture. So we try to open on each slouch and fall back to the
+   in-page nag, which can roam freely, whenever that is refused.
    ========================================================= */
 const PIP_OK = typeof documentPictureInPicture !== "undefined";
+let pipDenied = false;
 
-async function openPip(){
-  if(!PIP_OK || pipWin) return;
+async function showPip(){
+  if(!PIP_OK || pipDenied || pipWin) return false;
+  if(!$("pipOn").checked) return false;
   try{
-    pipWin = await documentPictureInPicture.requestWindow({width:300, height:300});
+    pipWin = await documentPictureInPicture.requestWindow({width:320, height:210});
   }catch(e){
-    $("pipHint").textContent = "Chrome blocked the pop-out: " + e.message;
+    pipDenied = true;
+    $("pipHint").textContent = "Chrome would not float a window without a click. Using the in-page popup instead.";
     $("pipHint").classList.add("warn");
-    return;
+    return false;
   }
 
   const d = pipWin.document;
-  d.body.style.cssText = "margin:0;background:#0a0908;color:#f2ede9;"+
-    "font:14px/1.4 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;"+
-    "display:flex;flex-direction:column;align-items:center;justify-content:center;"+
-    "height:100vh;gap:10px;text-align:center;overflow:hidden";
-
-  const score = d.createElement("div");
-  score.style.cssText = "font-size:64px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums";
-  score.textContent = "--";
-
-  const label = d.createElement("div");
-  label.style.cssText = "font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:#9a908a";
-  label.textContent = "posture";
+  d.body.style.cssText = "margin:0;background:#000;overflow:hidden;display:flex;"+
+    "flex-direction:column;height:100vh;font:13px/1.35 -apple-system,BlinkMacSystemFont,system-ui,sans-serif";
 
   const vid = d.createElement("video");
   vid.src = new URL("assets/warning.mp4", location.href).href;
   vid.loop = true; vid.playsInline = true;
-  vid.style.cssText = "width:100%;display:none;border-radius:0";
+  vid.style.cssText = "flex:1;width:100%;object-fit:cover;background:#000";
 
   const jeer = d.createElement("div");
-  jeer.style.cssText = "font-size:12px;font-weight:700;color:#ff4d4d;padding:0 10px;display:none";
+  jeer.style.cssText = "padding:8px 10px;background:#121110;color:#ff4d4d;font-weight:700;text-align:center";
+  jeer.textContent = $("warntext").textContent;
 
-  d.body.append(vid, jeer, score, label);
-  pipEls = {score, label, vid, jeer};
+  d.body.append(vid, jeer);
+  pipEls = {vid, jeer};
 
-  pipWin.addEventListener("pagehide", ()=>{ pipWin=null; pipEls=null; syncPipUi(); });
-  syncPipUi();
+  vid.muted = !$("soundOn").checked;
+  vid.play().catch(()=>{ vid.muted = true; vid.play().catch(()=>{}); });
+
+  pipWin.addEventListener("pagehide", ()=>{ pipWin=null; pipEls=null; });
+  return true;
 }
 
-function syncPipUi(){
-  const open = !!pipWin;
-  $("pipBtn").textContent = open ? "Close pop-out" : "Pop out";
-  if(!PIP_OK){
-    $("pipBtn").disabled = true;
-    $("pipHint").textContent = "This browser cannot float a window on top. Chrome or Edge can.";
-    $("pipHint").classList.add("warn");
-  } else if(open){
-    $("pipHint").textContent = "Floating on top of your other windows.";
-    $("pipHint").classList.remove("warn");
-  } else {
-    $("pipHint").textContent = "Keeps the nag on top of every other app.";
-    $("pipHint").classList.remove("warn");
-  }
+function closePip(){
+  if(!pipWin) return;
+  try{ pipWin.close(); }catch(e){}
+  pipWin = null; pipEls = null;
 }
 
 /* ========================== nag =========================== */
@@ -608,16 +596,11 @@ function showNag(){
   v.muted = !$("soundOn").checked;
   v.play().catch(()=>{ v.muted = true; v.play().catch(()=>{}); });
 
-  if(pipEls){
-    pipEls.vid.style.display = "block";
-    pipEls.jeer.style.display = "block";
-    pipEls.jeer.textContent = $("warntext").textContent;
-    pipEls.score.style.display = "none";
-    pipEls.label.style.display = "none";
-    pipEls.vid.currentTime = 0;
-    pipEls.vid.muted = !$("soundOn").checked;
-    pipEls.vid.play().catch(()=>{ pipEls.vid.muted = true; pipEls.vid.play().catch(()=>{}); });
-  }
+  // If the floating window opens, it replaces the in-page popup so the
+  // user is not shouted at twice.
+  showPip().then(opened => {
+    if(opened && alerting){ el.classList.add("out"); setTimeout(()=>{ if(alerting) el.hidden = true; }, 250); $("warnvid").pause(); }
+  });
 }
 
 function hideNag(){
@@ -626,13 +609,7 @@ function hideNag(){
   setTimeout(()=>{ el.hidden = true; $("warnvid").pause(); }, 250);
   alerting = false; badMs = 0; goodMs = 0; cooldownMs = COOLDOWN;
 
-  if(pipEls){
-    pipEls.vid.pause();
-    pipEls.vid.style.display = "none";
-    pipEls.jeer.style.display = "none";
-    pipEls.score.style.display = "";
-    pipEls.label.style.display = "";
-  }
+  closePip();
 }
 
 /* ========================= loop ========================== */
@@ -721,11 +698,6 @@ function loop(){
     $("meterfill").style.width = `${score}%`;
     $("meterfill").style.background = col;
     $("stateLabel").textContent = good ? "upright" : "shrimping";
-    if(pipEls && !alerting){
-      pipEls.score.textContent = Math.round(score);
-      pipEls.score.style.color = col;
-      pipEls.label.textContent = good ? "good" : "shrimping";
-    }
     $("stUpright").textContent = sessionMs>0 ? `${Math.round(uprightMs/sessionMs*100)}%` : "0%";
     $("stSession").textContent = fmt(sessionMs);
     $("stStreak").textContent  = fmt(bestStreak);
@@ -770,7 +742,7 @@ async function startCamera(){
 $("wPrimary").addEventListener("click", ()=>{
   const s = step();
   if(s.kind==="intro") startCamera();
-  else if(s.kind==="done"){ goLive(); if(PIP_OK) openPip(); }   // this click is the gesture the API needs
+  else if(s.kind==="done") goLive();
 });
 
 $("wSkip").addEventListener("click", ()=>{
@@ -779,10 +751,6 @@ $("wSkip").addEventListener("click", ()=>{
   else if(s.kind==="capture") nextStep();   // reference stays undefined; scoring adapts
 });
 
-$("pipBtn").addEventListener("click", ()=>{
-  if(pipWin){ pipWin.close(); pipWin=null; pipEls=null; syncPipUi(); }
-  else openPip();
-});
 $("tutorialBtn").addEventListener("click", ()=> backToWizard(STEPS.findIndex(s=>s.id==="t1")));
 $("recalBtn").addEventListener("click", ()=>{
   refs = {}; spread = null; scoreEMA = null; armBase = null;
@@ -799,6 +767,5 @@ $("thresh").addEventListener("input", e=> $("thVal").textContent = e.target.valu
 $("grace").addEventListener("input",  e=> $("graceVal").textContent = e.target.value+"s");
 
 $("videobox").classList.add("fullscreen");
-syncPipUi();
 showStep();
 resize();
