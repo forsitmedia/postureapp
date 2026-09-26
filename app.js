@@ -42,62 +42,62 @@ const JEERS = [
 const STEPS = [
   { id:"intro", kind:"intro",
     title:"Unshrimp Tracker",
-    body:"First we learn how you normally sit. Then we record your bad habits so we can spot them. Then we teach you the good one. Takes about a minute.",
+    body:"We learn how you sit, record your bad habits, then teach you the good one.",
     btn:"Start camera" },
 
   { id:"frame", kind:"frame",
     title:"Let's find you",
-    body:"Sit back so your <b>head and both shoulders</b> are in the picture. We'll move on by ourselves." },
+    body:"Get your <b>head and both shoulders</b> in the picture." },
 
-  { id:"normal", kind:"capture", ref:"normal",
+  { id:"normal", teach:2600, kind:"capture", ref:"normal",
     title:"Sit how you normally sit",
-    body:"Don't correct anything. Slouch if you slouch. This is the baseline we compare against.",
+    body:"Don't correct anything. Sit exactly as you were.",
     cue:"Be honest. Hold still." },
 
-  { id:"turn", kind:"sweep",
+  { id:"turn", teach:2600, kind:"sweep",
     title:"Now turn your head left, then right",
-    body:"Look over one shoulder, then the other, like you would to talk to someone. We learn your range so turning your head never counts against you.",
+    body:"Look over one shoulder, then the other.",
     cue:"Turn all the way to one side, then the other." },
 
-  { id:"close", kind:"capture", ref:"close", diff:true,
+  { id:"close", teach:2600, kind:"capture", ref:"close", diff:true,
     title:"Now lean into the screen",
-    body:"Push your head and chest toward the monitor, like you're reading something tiny.",
+    body:"Push your head and chest toward the monitor.",
     cue:"Closer. Exaggerate it." },
 
-  { id:"down", kind:"capture", ref:"down", diff:true, anchor:"top",
+  { id:"down", teach:2600, kind:"capture", ref:"down", diff:true, anchor:"top",
     title:"Now lean back and sink",
-    body:"Push away from the desk and let yourself drop into the backrest. Chin down, weight back.",
+    body:"Push off the desk. Drop into the backrest.",
     cue:"Lean back. Let gravity win." },
 
-  { id:"left", kind:"capture", ref:"left", diff:true,
+  { id:"left", teach:2600, hold:3000, kind:"capture", ref:"left", diff:true,
     title:"Collapse onto your left",
-    body:"Drop your left shoulder and lean your weight onto that side.",
+    body:"Drop your <b>left</b> shoulder and lean that way.",
     cue:"Left shoulder down." },
 
-  { id:"right", kind:"capture", ref:"right", diff:true,
+  { id:"right", teach:2600, hold:3000, kind:"capture", ref:"right", diff:true,
     title:"Now the other side",
-    body:"Same thing, mirrored. Drop your right shoulder and lean right.",
+    body:"Now the other side. Drop your <b>right</b> shoulder.",
     cue:"Right shoulder down." },
 
   { id:"t1", teach:3000, img:"assets/tutorial/step1.png", kind:"tutorial", check:"elbowsIn", hold:2800,
     title:"Elbows to your sides",
-    body:"Bring both elbows in until they're <b>touching your sides</b>. Thumbs pointing outward.",
+    body:"Elbows in until they <b>touch your sides</b>. Thumbs out.",
     cue:"Elbows in, thumbs out." },
 
   { id:"t2", teach:3000, img:"assets/tutorial/step2.png", kind:"tutorial", check:"rotateOut",
     hold:6000, holdText:"Keep rotating - hold it open.",
     title:"Rotate your thumbs out",
-    body:"Keep your elbows pinned to your sides and rotate your thumbs outward <b>as far as they'll go</b>. Your shoulders will pull back and even out on their own.",
+    body:"Elbows pinned. Rotate your thumbs outward <b>as far as they go</b>.",
     cue:"As far as you can. Elbows stay put." },
 
   { id:"t3", teach:3000, img:"assets/tutorial/step3.png", kind:"tutorial", check:"armsDown", hold:2800,
     title:"Now drop your arms",
-    body:"Let your arms fall loose, but <b>keep your chest and shoulders exactly where they are</b>.",
+    body:"Let your arms fall. <b>Keep your chest where it is.</b>",
     cue:"Arms down. Chest stays open." },
 
   { id:"ideal", teach:3000, img:"assets/tutorial/step4.png", kind:"capture", ref:"ideal", relaxMs:14000, hold:2600,
     title:"That's your position. Hold it.",
-    body:"Put your hands back on the keyboard and keep the chest and shoulders you just built. This is what we'll hold you to.",
+    body:"Hands back on the keyboard. Keep this position.",
     cue:"Shoulders level, chest open, head stacked." },
 
   { id:"done", kind:"done",
@@ -292,16 +292,16 @@ const GATES = {
 
   left: (f,n) => {
     const t = f.tilt - n.tilt;
-    return t > 0.085 ? {ok:true,  hint:"Hold it there."}
-         : t > 0.040 ? {ok:false, hint:"A little further."}
-                     : {ok:false, hint:"Drop your LEFT shoulder."};
+    return t > 0.130 ? {ok:true,  hint:"Hold it there.", metric:`tilt ${t.toFixed(2)}`}
+         : t > 0.060 ? {ok:false, hint:"Further - really drop it.", metric:`tilt ${t.toFixed(2)} / need 0.13`}
+                     : {ok:false, hint:"Drop your LEFT shoulder.", metric:`tilt ${t.toFixed(2)} / need 0.13`};
   },
 
   right: (f,n) => {
     const t = n.tilt - f.tilt;
-    return t > 0.085 ? {ok:true,  hint:"Hold it there."}
-         : t > 0.040 ? {ok:false, hint:"A little further."}
-                     : {ok:false, hint:"Drop your RIGHT shoulder."};
+    return t > 0.130 ? {ok:true,  hint:"Hold it there.", metric:`tilt ${t.toFixed(2)}`}
+         : t > 0.060 ? {ok:false, hint:"Further - really drop it.", metric:`tilt ${t.toFixed(2)} / need 0.13`}
+                     : {ok:false, hint:"Drop your RIGHT shoulder.", metric:`tilt ${t.toFixed(2)} / need 0.13`};
   },
 
   // Captured straight after the tutorial, hands back on the keyboard.
@@ -332,7 +332,7 @@ let armBase = null;   // wrist spread recorded once the elbows are pinned
 const CHECKS = {
   elbowsIn:      f => f.tuck < 0.42,
   // elbows stay pinned while the hands swing outward
-  rotateOut:     f => f.tuck < 0.58 && (armBase === null || f.wristSpread > armBase + 0.045),
+  rotateOut:     () => true,   // not observable from pose landmarks - timed instead
   armsDown:      f => f.wristDrop > 0.25
 };
 const CHECK_HINT = {
@@ -342,7 +342,7 @@ const CHECK_HINT = {
 };
 const CHECK_METRIC = {
   elbowsIn: f => `elbows ${f.tuck.toFixed(2)} / need under 0.42`,
-  rotateOut:f => `rotation ${f.wristSpread.toFixed(2)}` + (armBase!==null?` / need ${(armBase+0.045).toFixed(2)}`:""),
+  rotateOut:() => "",
   armsDown: f => `hands ${f.wristDrop.toFixed(2)} / need over 0.25`
 };
 
@@ -488,6 +488,8 @@ function wizardTick(f, ok, dt){
                : g.hint;
     $("wmetric").hidden = !g.metric || !ok;
     if(g.metric) $("wmetric").textContent = g.metric;
+    $("wframing").hidden = ok;                       // only shown when framing is the problem
+    if(s.diff) $("wSkip").hidden = gateFailMs < 5000;
 
     if(holdMs >= need && f) capture(f, s.ref);
     return;

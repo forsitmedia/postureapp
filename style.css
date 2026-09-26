@@ -41,7 +41,7 @@ body{
   width:min(900px,100%);text-align:center;pointer-events:auto;
   display:flex;gap:24px;align-items:center;justify-content:center;
   background:rgba(12,11,10,.80);backdrop-filter:blur(20px);
-  border:1px solid var(--line);border-radius:20px;padding:22px 30px 18px;
+  border:1px solid var(--line);border-radius:20px;padding:15px 26px 11px;
   box-shadow:0 20px 70px rgba(0,0,0,.65);
 }
 .wcontent{flex:1;min-width:0}
@@ -54,33 +54,33 @@ body{
 .wcard.teaching .wimg{width:min(300px,38vh)}
 .wcard.teaching .wbody{margin-bottom:4px}
 @media (max-width:640px){ .wcard{flex-direction:column;gap:14px} .wimg{width:120px} }
-.wstep{font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--accent);font-weight:700;margin-bottom:8px}
-.wtitle{margin:0 0 8px;font-size:clamp(22px,3.1vw,32px);font-weight:800;letter-spacing:-.02em;line-height:1.12}
-.wbody{color:var(--dim);font-size:clamp(14px,1.5vw,16px);margin:0 auto 14px;max-width:62ch;line-height:1.5}
+.wstep{font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--accent);font-weight:700;margin-bottom:5px}
+.wtitle{margin:0 0 5px;font-size:clamp(25px,3.3vw,36px);font-weight:800;letter-spacing:-.02em;line-height:1.1}
+.wbody{color:var(--dim);font-size:clamp(16px,1.8vw,19px);margin:0 auto 10px;max-width:44ch;line-height:1.4}
 .wbody b{color:var(--txt)}
 .wcue{
-  display:inline-block;margin:0 0 12px;padding:9px 16px;border-radius:11px;
+  display:inline-block;margin:0 0 7px;padding:7px 15px;border-radius:10px;
   background:rgba(255,122,47,.12);border:1px solid rgba(255,122,47,.3);
-  color:var(--accent);font-weight:700;font-size:15px;
+  color:var(--accent);font-weight:700;font-size:17px;
 }
 .wcue.ok{background:rgba(61,220,151,.12);border-color:rgba(61,220,151,.35);color:var(--good)}
 
 .wmetric{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#6f6762;
-  font-variant-numeric:tabular-nums;margin:-6px 0 12px}
-.hold{height:8px;background:var(--panel2);border-radius:99px;overflow:hidden;margin:0 auto 14px;border:1px solid var(--line);max-width:420px}
+  font-variant-numeric:tabular-nums;margin:-2px 0 8px}
+.hold{height:8px;background:var(--panel2);border-radius:99px;overflow:hidden;margin:0 auto 9px;border:1px solid var(--line);max-width:340px}
 .holdfill{height:100%;width:0%;background:#6b625c;border-radius:99px;transition:width .1s linear,background .25s}
 .holdfill.ready{background:var(--good);box-shadow:0 0 14px rgba(61,220,151,.5)}
 
-.wframing{display:flex;gap:8px;justify-content:center;margin-bottom:14px;flex-wrap:wrap}
-.chip{font-size:11px;letter-spacing:.14em;text-transform:uppercase;padding:6px 12px;border-radius:99px;
+.wframing{display:flex;gap:6px;justify-content:center;margin-bottom:9px;flex-wrap:wrap}
+.chip{font-size:10px;letter-spacing:.12em;text-transform:uppercase;padding:4px 10px;border-radius:99px;
   border:1px solid var(--line);color:var(--dim);background:var(--panel2);transition:.25s}
 .chip.ok{border-color:var(--good);color:var(--good);background:rgba(61,220,151,.1)}
 
 .wbtns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
-.wdots{display:flex;gap:6px;justify-content:center;margin-top:16px;flex-wrap:wrap}
-.wdots i{width:6px;height:6px;border-radius:99px;background:var(--line);transition:.3s}
+.wdots{display:flex;gap:5px;justify-content:center;margin-top:9px;flex-wrap:wrap}
+.wdots i{width:5px;height:5px;border-radius:99px;background:var(--line);transition:.3s}
 .wdots i.done{background:var(--good)}
-.wdots i.now{background:var(--accent);width:20px}
+.wdots i.now{background:var(--accent);width:16px}
 
 /* steps where the user moves their body need the frame, not the caption */
 .wizard.top{align-items:flex-start;padding-top:max(20px, env(safe-area-inset-top, 0px))}
@@ -125,7 +125,7 @@ h1 .ver{color:var(--dim);font-weight:500}
 /* ================= controls ================= */
 .btnrow{display:flex;gap:9px;flex-wrap:wrap}
 .btnrow.center{justify-content:center}
-.btn{background:var(--panel2);color:var(--txt);border:1px solid var(--line);padding:11px 18px;
+.btn{background:var(--panel2);color:var(--txt);border:1px solid var(--line);padding:9px 16px;
   border-radius:10px;font:inherit;font-weight:600;cursor:pointer;transition:.18s}
 .btn:hover{border-color:#453f3b;background:#221f1d}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:#1a0d04}
