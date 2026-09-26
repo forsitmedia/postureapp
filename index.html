@@ -107,6 +107,18 @@
       </div>
 
       <div class="panel">
+        <h2>Rest</h2>
+        <div class="btnrow">
+          <button class="btn primary wide" id="breakNow">Take a break</button>
+        </div>
+        <label class="slider tight">
+          <span>Also remind me every <b id="breakEveryVal">45 min</b></span>
+          <input type="range" id="breakEvery" min="10" max="90" step="5" value="45">
+        </label>
+        <div class="nextbreak" id="nextBreak">Next nudge in 45:00</div>
+      </div>
+
+      <div class="panel">
         <h2>Sensitivity</h2>
         <label class="slider">
           <span>Alert threshold <b id="thVal">55</b></span>
@@ -131,6 +143,20 @@
       </div>
     </aside>
   </main>
+</div>
+
+<!-- ==================== BREAK ==================== -->
+<div class="breakwrap" id="breakwrap" hidden>
+  <div class="breakcard">
+    <div class="breakicon" id="breakIcon">&#129485;</div>
+    <h2 class="breaktitle" id="breakTitle">Time to stand up</h2>
+    <p class="breakbody" id="breakBody">You&rsquo;ve been sitting a while. Walk it off for five minutes.</p>
+    <div class="breaktimer" id="breakTimer" hidden>5:00</div>
+    <div class="btnrow center">
+      <button class="btn primary" id="breakStart">Start break</button>
+      <button class="btn ghost" id="breakSkip">Not now</button>
+    </div>
+  </div>
 </div>
 
 <!-- ==================== NAG ==================== -->

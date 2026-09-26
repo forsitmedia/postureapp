@@ -137,6 +137,8 @@ let prevFeat=null, motionEMA=0, gateFailMs=0;
 let teaching=false, teachMs=0;
 let turnRange=0, sweepL=0, sweepR=0;
 let points=0, lastLevel=0;
+let onBreak=false, breakMs=0, workMs=0, promptOpen=false;
+const BREAK_LEN = 5*60*1000;
 
 const HOLD = 2400, COOLDOWN = 1200;   // short re-arm; the nag clears itself on recovery
 const RECOVER_MS = 600;               // how long you must look good before it lets go
@@ -683,6 +685,47 @@ function toastRank(msg){
   rankToastAt = performance.now() + 2600;
 }
 
+/* ========================== rest ==========================
+   The user decides when to stop. The timed reminder only offers;
+   it never pauses anything on its own. While resting, scoring,
+   stats, points and alerts are all suspended so a walk away from
+   the desk cannot cost a rank.
+   ========================================================= */
+function openBreakPrompt(){
+  promptOpen = true;
+  $("breakIcon").textContent = "\u{1F9CD}";
+  $("breakTitle").textContent = "Time to stand up";
+  $("breakBody").textContent = "You have been sitting for a while. Walk it off for five minutes.";
+  $("breakTimer").hidden = true;
+  $("breakStart").textContent = "Start break";
+  $("breakSkip").hidden = false;
+  $("breakwrap").hidden = false;
+}
+
+function startBreak(){
+  onBreak = true; promptOpen = false; breakMs = BREAK_LEN;
+  if(alerting) hideNag();
+  $("breakIcon").textContent = "\u{2615}";
+  $("breakTitle").textContent = "Resting";
+  $("breakBody").textContent = "Tracking is paused. Nothing counts against you.";
+  $("breakTimer").hidden = false;
+  $("breakStart").textContent = "I'm back";
+  $("breakSkip").hidden = true;
+  $("breakwrap").hidden = false;
+  $("stateLabel").textContent = "resting";
+}
+
+function endBreak(){
+  onBreak = false; promptOpen = false; workMs = 0;
+  $("breakwrap").hidden = true;
+  scoreEMA = null; badMs = 0;          // come back with a clean slate
+}
+
+function fmtClock(ms){
+  const t = Math.max(0, Math.ceil(ms/1000));
+  return Math.floor(t/60) + ":" + String(t%60).padStart(2,"0");
+}
+
 /* ========================= loop ========================== */
 function loop(){
   requestAnimationFrame(loop);
@@ -725,6 +768,11 @@ function loop(){
   if(!live){
     wizardTick(f, ok, dt);
     if(step().kind==="tutorial" && f) col = CHECKS[step().check](f) ? "#3ddc97" : "#ff7a2f";
+  } else if(onBreak){
+    breakMs -= dt;
+    $("breakTimer").textContent = fmtClock(breakMs);
+    if(breakMs <= 0) endBreak();
+    col = "#3ddc97";
   } else if(f && ok){
     const raw = computeScore(f);
     // Fall fast so the grace period starts the instant you slump; rise
@@ -744,6 +792,11 @@ function loop(){
     dg.textContent = good ? "Looking good." : BAD_LABELS[worst];
     dg.className = "diagnosis " + (good?"good":"bad");
 
+    workMs += dt;
+    const everyMs = (+$("breakEvery").value) * 60000;
+    $("nextBreak").textContent = "Next nudge in " + fmtClock(everyMs - workMs);
+    if(workMs >= everyMs && !promptOpen) openBreakPrompt();
+
     sessionMs += dt;
     if(good){
       uprightMs += dt; streakMs += dt; bestStreak = Math.max(bestStreak, streakMs);
@@ -761,7 +814,7 @@ function loop(){
         nagMoveMs += dt;
         if(nagMoveMs > 7000){ nagMoveMs = 0; placeNag(); }   // keep moving if ignored
       }
-    } else if(!good){
+    } else if(!good && !onBreak){
       badMs += dt;                                      // counts during re-arm too
       if(badMs >= graceMs && cooldownMs <= 0) showNag();
     } else { badMs = 0; }
@@ -837,6 +890,16 @@ $("resetBtn").addEventListener("click", ()=>{
   $("stUpright").textContent="0%"; $("stSession").textContent="0:00";
   $("stAlerts").textContent="0"; $("stStreak").textContent="0:00";
 });
+$("breakNow").addEventListener("click", startBreak);
+$("breakStart").addEventListener("click", ()=> onBreak ? endBreak() : startBreak());
+$("breakSkip").addEventListener("click", ()=>{
+  promptOpen = false;
+  $("breakwrap").hidden = true;
+  workMs -= 10*60000;                  // ask again in ten minutes
+});
+$("breakEvery").addEventListener("input", e =>
+  $("breakEveryVal").textContent = e.target.value + " min");
+
 $("warnClose").addEventListener("click", hideNag);
 addEventListener("resize", ()=>{ if(alerting) placeNag(); });
 $("thresh").addEventListener("input", e=> $("thVal").textContent = e.target.value);
