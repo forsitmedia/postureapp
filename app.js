@@ -391,6 +391,7 @@ function showStep(){
   $("wizard").classList.toggle("center", landing);
   $("wstep").hidden = landing;
   $("wdots").hidden = landing;
+  $("logo").hidden  = !landing;
   $("hero").hidden  = !landing;
   $("scale").hidden = !landing;
   if(landing && !$("scale").dataset.built){
