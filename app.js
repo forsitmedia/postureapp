@@ -99,23 +99,23 @@ const STEPS = [
     body:"Now the other side. Drop your <b>right</b> shoulder.",
     cue:"Right shoulder down." },
 
-  { id:"t1", teach:3000, img:"assets/tutorial/step1.png", kind:"tutorial", check:"elbowsIn", hold:2800,
+  { id:"t1", ready:"hand", teach:3000, img:"assets/tutorial/step1.png", kind:"tutorial", check:"elbowsIn", hold:2800,
     title:"Elbows to your sides",
     body:"Elbows in until they <b>touch your sides</b>. Thumbs out.",
     cue:"Elbows in, thumbs out." },
 
-  { id:"t2", teach:3000, img:"assets/tutorial/step2.png", kind:"tutorial", check:"rotateOut",
-    hold:6000, holdText:"Keep rotating - hold it open.",
+  { id:"t2", ready:"hand", teach:3000, img:"assets/tutorial/step2.png", kind:"tutorial", check:"rotateOut",
+    hold:9000, holdText:"Keep rotating - hold it open.",
     title:"Rotate your thumbs out",
     body:"Elbows pinned. Rotate your thumbs outward <b>as far as they go</b>.",
     cue:"As far as you can. Elbows stay put." },
 
-  { id:"t3", teach:3000, img:"assets/tutorial/step3.png", kind:"tutorial", check:"armsDown", hold:2800,
+  { id:"t3", ready:"hand", teach:3000, img:"assets/tutorial/step3.png", kind:"tutorial", check:"armsDown", hold:2800,
     title:"Now drop your arms",
     body:"Let your arms fall. <b>Keep your chest where it is.</b>",
     cue:"Arms down. Chest stays open." },
 
-  { id:"ideal", teach:3000, img:"assets/tutorial/step4.png", kind:"capture", ref:"ideal", relaxMs:14000, hold:2600,
+  { id:"ideal", ready:"hand", teach:3000, img:"assets/tutorial/step4.png", kind:"capture", ref:"ideal", relaxMs:14000, hold:2600,
     title:"That's your position. Hold it.",
     body:"Hands back on the keyboard. Keep this position.",
     cue:"Shoulders level, chest open, head stacked." },
@@ -162,7 +162,10 @@ function features(lm){
     tuck : (tuckL + tuckR)/2,
     wristDrop: ((lm[L_WR].y - lm[L_EL].y) + (lm[R_WR].y - lm[R_EL].y))/2/size,
     // hands swinging out away from the elbows - what rotating the thumbs looks like
-    wristSpread: (Math.abs(lm[L_WR].x - lm[L_EL].x) + Math.abs(lm[R_WR].x - lm[R_EL].x))/2/size
+    wristSpread: (Math.abs(lm[L_WR].x - lm[L_EL].x) + Math.abs(lm[R_WR].x - lm[R_EL].x))/2/size,
+    // either wrist lifted clearly above the shoulder line
+    handUp: ((lm[L_WR].visibility ?? 1) > .4 && lm[L_WR].y < ls.y - size*0.15) ||
+            ((lm[R_WR].visibility ?? 1) > .4 && lm[R_WR].y < rs.y - size*0.15)
   };
 }
 
@@ -451,11 +454,28 @@ function wizardTick(f, ok, dt){
   // Hold the illustration on screen first so the user reads the pose
   // before anything starts counting.
   if(teaching){
-    teachMs += dt;
-    const left = Math.ceil((s.teach - teachMs)/1000);
-    $("wmetric").hidden = false;
-    $("wmetric").textContent = `get into this position - ${left}s`;
-    if(teachMs >= s.teach){
+    // Steps that ask for a real body position wait for the user to say
+    // they are ready by lifting a hand, rather than starting on a timer
+    // they may not have finished reading.
+    if(s.ready === "hand"){
+      const up = !!(f && f.handUp);
+      $("wmetric").hidden = false;
+      $("wmetric").textContent = up ? "got it - hand down and get set" : "raise a hand when you have read this";
+      $("wcue").hidden = false;
+      $("wcue").classList.toggle("ok", up);
+      $("wcue").textContent = up ? "Ready." : "Raise a hand to start";
+      $("wSkip").hidden = false;
+      $("wSkip").textContent = "Start now";
+      teachMs = up ? teachMs + dt : 0;
+      if(teachMs < 500) return;          // a brief hold, so a passing gesture does not count
+    } else {
+      teachMs += dt;
+      const left = Math.ceil((s.teach - teachMs)/1000);
+      $("wmetric").hidden = false;
+      $("wmetric").textContent = `get into this position - ${left}s`;
+    }
+
+    if(s.ready === "hand" || teachMs >= s.teach){
       teaching = false;
       document.querySelector(".wcard").classList.remove("teaching");
       $("holdwrap").hidden = false;
@@ -874,6 +894,16 @@ $("wPrimary").addEventListener("click", ()=>{
 
 $("wSkip").addEventListener("click", ()=>{
   const s = step();
+  if(teaching){                         // "Start now" during the ready phase
+    teaching = false;
+    document.querySelector(".wcard").classList.remove("teaching");
+    $("holdwrap").hidden = false;
+    $("wcue").hidden = !s.cue;
+    holdMs = 0; gateFailMs = 0; tutorialHint = 0;
+    $("wSkip").hidden = s.kind !== "tutorial";
+    $("wSkip").textContent = s.kind === "tutorial" ? "Continue" : "Skip this pose";
+    return;
+  }
   if(s.kind==="tutorial") nextStep();
   else if(s.kind==="capture") nextStep();   // reference stays undefined; scoring adapts
 });
