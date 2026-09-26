@@ -105,8 +105,10 @@ let smoothLm=null, refs={}, spread=null, scoreEMA=null, score=100;
 let sessionMs=0, uprightMs=0, alerts=0, streakMs=0, bestStreak=0;
 let badMs=0, alerting=false, cooldownMs=0, live=false, tutorialHint=0;
 let advancing=false;   // latch: stop the loop re-firing a step while it advances
+let goodMs=0, nagMoveMs=0, lastNagPos=null;
 
-const HOLD = 1700, COOLDOWN = 12000;
+const HOLD = 1700, COOLDOWN = 2500;   // short re-arm; the nag clears itself on recovery
+const RECOVER_MS = 600;               // how long you must look good before it lets go
 const step = () => STEPS[stepIdx];
 
 /* ==================== feature extraction ================= */
@@ -343,6 +345,7 @@ function goLive(){
 
 function backToWizard(fromIdx){
   live = false;
+  if(alerting) hideNag();
   const box = $("videobox");
   box.classList.add("fullscreen");
   document.body.appendChild(box);
@@ -362,20 +365,52 @@ function renderFaults(am, worst){
   }).join("");
 }
 
-/* ======================== warning ======================== */
-function fireWarning(){
-  alerting = true; alerts++; $("stAlerts").textContent = alerts;
-  $("warntext").textContent = JEERS[Math.floor(Math.random()*JEERS.length)];
-  $("warnwrap").hidden = false;
-  const v=$("warnvid");
-  if($("soundOn").checked){
-    v.currentTime=0; v.muted=false;
-    v.play().catch(()=>{ v.muted=true; v.play().catch(()=>{}); });
-  }
+/* ========================== nag =========================== */
+/* Drops the video somewhere new on screen each time, and pulls it
+   back the moment the user returns to a good score. */
+function placeNag(){
+  const el = $("nag");
+  const w = el.offsetWidth  || 260;
+  const h = el.offsetHeight || 210;
+  const m = 22;
+  const maxX = Math.max(m, innerWidth  - w - m);
+  const maxY = Math.max(m, innerHeight - h - m);
+  const far  = Math.min(innerWidth, innerHeight) * 0.34;
+
+  let x, y, tries = 0;
+  do{
+    x = m + Math.random()*(maxX-m);
+    y = m + Math.random()*(maxY-m);
+    tries++;
+  } while(tries < 10 && lastNagPos &&
+          Math.hypot(x-lastNagPos.x, y-lastNagPos.y) < far);   // never twice in the same spot
+
+  lastNagPos = {x,y};
+  el.style.left = x+"px";
+  el.style.top  = y+"px";
 }
-function closeWarning(){
-  $("warnwrap").hidden = true; $("warnvid").pause();
-  alerting=false; badMs=0; cooldownMs=COOLDOWN;
+
+function showNag(){
+  alerting = true; alerts++; nagMoveMs = 0; goodMs = 0;
+  $("stAlerts").textContent = alerts;
+  $("warntext").textContent = JEERS[Math.floor(Math.random()*JEERS.length)];
+
+  const el = $("nag");
+  el.classList.remove("out");
+  el.hidden = false;
+  placeNag();
+
+  const v = $("warnvid");
+  v.currentTime = 0;
+  v.muted = !$("soundOn").checked;
+  v.play().catch(()=>{ v.muted = true; v.play().catch(()=>{}); });
+}
+
+function hideNag(){
+  const el = $("nag");
+  el.classList.add("out");
+  setTimeout(()=>{ el.hidden = true; $("warnvid").pause(); }, 250);
+  alerting = false; badMs = 0; goodMs = 0; cooldownMs = COOLDOWN;
 }
 
 /* ========================= loop ========================== */
@@ -427,10 +462,19 @@ function loop(){
     else streakMs = 0;
 
     if(cooldownMs>0) cooldownMs -= dt;
-    if(!good && !alerting && cooldownMs<=0){
+
+    if(alerting){
+      // straighten up and it lets go by itself
+      if(good){ goodMs += dt; if(goodMs >= RECOVER_MS) hideNag(); }
+      else{
+        goodMs = 0;
+        nagMoveMs += dt;
+        if(nagMoveMs > 7000){ nagMoveMs = 0; placeNag(); }   // keep moving if ignored
+      }
+    } else if(!good && cooldownMs <= 0){
       badMs += dt;
-      if(badMs >= graceMs) fireWarning();
-    } else if(good) badMs = 0;
+      if(badMs >= graceMs) showNag();
+    } else if(good){ badMs = 0; }
 
     $("scorenum").textContent = Math.round(score);
     $("scorenum").style.color = col;
@@ -501,11 +545,8 @@ $("resetBtn").addEventListener("click", ()=>{
   $("stUpright").textContent="0%"; $("stSession").textContent="0:00";
   $("stAlerts").textContent="0"; $("stStreak").textContent="0:00";
 });
-$("warnClose").addEventListener("click", closeWarning);
-$("warnFix").addEventListener("click", ()=>{
-  closeWarning(); backToWizard(STEPS.findIndex(s=>s.id==="t1"));
-});
-$("warnvid").addEventListener("ended", closeWarning);
+$("warnClose").addEventListener("click", hideNag);
+addEventListener("resize", ()=>{ if(alerting) placeNag(); });
 $("thresh").addEventListener("input", e=> $("thVal").textContent = e.target.value);
 $("grace").addEventListener("input",  e=> $("graceVal").textContent = e.target.value+"s");
 

@@ -121,13 +121,24 @@ h1 .ver{color:var(--dim);font-weight:500}
 .toggle{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--dim);cursor:pointer}
 .toggle input{accent-color:var(--accent);width:15px;height:15px}
 
-/* ================= warning ================= */
-.warnwrap{position:fixed;inset:0;z-index:50;display:grid;place-items:center;
-  background:rgba(6,4,3,.9);backdrop-filter:blur(7px);padding:20px}
-.warncard{background:var(--panel);border:1px solid var(--bad);border-radius:18px;padding:18px;
-  max-width:520px;width:100%;text-align:center;box-shadow:0 0 70px rgba(255,77,77,.28)}
-#warnvid{width:100%;border-radius:11px;background:#000;display:block;max-height:50vh}
-.warntext{font-size:19px;font-weight:700;margin:15px 0 16px;color:var(--bad)}
+/* ================= nag ================= */
+.nag{
+  position:fixed;z-index:60;width:clamp(200px,22vw,300px);
+  background:var(--panel);border:2px solid var(--bad);border-radius:14px;
+  overflow:hidden;box-shadow:0 18px 50px rgba(0,0,0,.65), 0 0 40px rgba(255,77,77,.3);
+  transition:left .55s cubic-bezier(.2,.8,.2,1), top .55s cubic-bezier(.2,.8,.2,1), opacity .25s, transform .25s;
+  animation:nagIn .28s cubic-bezier(.2,1.4,.4,1);
+}
+@keyframes nagIn{from{opacity:0;transform:scale(.82)}to{opacity:1;transform:scale(1)}}
+.nag.out{opacity:0;transform:scale(.88);pointer-events:none}
+#warnvid{width:100%;display:block;background:#000;aspect-ratio:16/9;object-fit:cover}
+.nagtext{padding:9px 12px;font-size:13px;font-weight:700;color:var(--bad);line-height:1.35}
+.nagclose{
+  position:absolute;top:6px;right:6px;width:26px;height:26px;border-radius:99px;
+  border:0;background:rgba(10,8,7,.72);color:#fff;font-size:17px;line-height:1;
+  cursor:pointer;display:grid;place-items:center;padding:0;
+}
+.nagclose:hover{background:var(--bad)}
 
 /* the hidden attribute must beat every display rule above */
 [hidden]{display:none !important}

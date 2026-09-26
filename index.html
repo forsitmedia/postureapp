@@ -110,16 +110,11 @@
   </main>
 </div>
 
-<!-- ==================== WARNING ==================== -->
-<div class="warnwrap" id="warnwrap" hidden>
-  <div class="warncard">
-    <video id="warnvid" src="assets/warning.mp4" playsinline></video>
-    <div class="warntext" id="warntext">I blinked and you became seafood. Fix it.</div>
-    <div class="btnrow center">
-      <button class="btn primary" id="warnClose">I've unshrimped</button>
-      <button class="btn ghost" id="warnFix">Remind me how</button>
-    </div>
-  </div>
+<!-- ==================== NAG ==================== -->
+<div class="nag" id="nag" hidden>
+  <video id="warnvid" src="assets/warning.mp4" playsinline loop></video>
+  <div class="nagtext" id="warntext">I blinked and you became seafood.</div>
+  <button class="nagclose" id="warnClose" title="Dismiss">&times;</button>
 </div>
 
 <script type="module" src="app.js"></script>
