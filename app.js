@@ -16,6 +16,7 @@ const dist  = (a,b) => Math.hypot(a.x-b.x, a.y-b.y);
 const video = $("video"), overlay = $("overlay"), ctx = overlay.getContext("2d");
 
 const NOSE=0, L_EAR=7, R_EAR=8, L_SH=11, R_SH=12, L_EL=13, R_EL=14, L_WR=15, R_WR=16;
+const FOCUS = { elbowsIn:[L_EL,R_EL], rotateOut:[L_EL,R_EL,L_WR,R_WR], armsDown:[L_WR,R_WR] };
 const SKELETON=[[L_SH,R_SH],[L_SH,L_EL],[R_SH,R_EL],[L_EL,L_WR],[R_EL,R_WR],
                 [NOSE,L_SH],[NOSE,R_SH],[L_EAR,NOSE],[R_EAR,NOSE]];
 
@@ -73,23 +74,23 @@ const STEPS = [
     body:"Same thing, mirrored. Drop your right shoulder and lean right.",
     cue:"Right shoulder down." },
 
-  { id:"t1", img:"assets/tutorial/step1.png", kind:"tutorial", check:"elbowsIn", hold:2800,
+  { id:"t1", teach:3000, img:"assets/tutorial/step1.png", kind:"tutorial", check:"elbowsIn", hold:2800,
     title:"Elbows to your sides",
     body:"Bring both elbows in until they're <b>touching your sides</b>. Thumbs pointing outward.",
     cue:"Elbows in, thumbs out." },
 
-  { id:"t2", img:"assets/tutorial/step2.png", kind:"tutorial", check:"shouldersLevel",
+  { id:"t2", teach:3000, img:"assets/tutorial/step2.png", kind:"tutorial", check:"rotateOut",
     hold:6000, holdText:"Keep rotating - hold it open.",
     title:"Rotate your thumbs out",
     body:"Keep your elbows pinned to your sides and rotate your thumbs outward <b>as far as they'll go</b>. Your shoulders will pull back and even out on their own.",
     cue:"As far as you can. Elbows stay put." },
 
-  { id:"t3", img:"assets/tutorial/step3.png", kind:"tutorial", check:"armsDown", hold:2800,
+  { id:"t3", teach:3000, img:"assets/tutorial/step3.png", kind:"tutorial", check:"armsDown", hold:2800,
     title:"Now drop your arms",
     body:"Let your arms fall loose, but <b>keep your chest and shoulders exactly where they are</b>.",
     cue:"Arms down. Chest stays open." },
 
-  { id:"ideal", img:"assets/tutorial/step4.png", kind:"capture", ref:"ideal", relaxMs:14000, hold:2600,
+  { id:"ideal", teach:3000, img:"assets/tutorial/step4.png", kind:"capture", ref:"ideal", relaxMs:14000, hold:2600,
     title:"That's your position. Hold it.",
     body:"Put your hands back on the keyboard and keep the chest and shoulders you just built. This is what we'll hold you to.",
     cue:"Shoulders level, chest open, head stacked." },
@@ -108,6 +109,7 @@ let badMs=0, alerting=false, cooldownMs=0, live=false, tutorialHint=0;
 let advancing=false;   // latch: stop the loop re-firing a step while it advances
 let goodMs=0, nagMoveMs=0, lastNagPos=null;
 let prevFeat=null, motionEMA=0, gateFailMs=0;
+let teaching=false, teachMs=0;
 
 const HOLD = 2400, COOLDOWN = 1200;   // short re-arm; the nag clears itself on recovery
 const RECOVER_MS = 600;               // how long you must look good before it lets go
@@ -129,7 +131,9 @@ function features(lm){
     tilt : (ls.y - rs.y)/size,
     off  : (nose.x - midX)/size,
     tuck : (tuckL + tuckR)/2,
-    wristDrop: ((lm[L_WR].y - lm[L_EL].y) + (lm[R_WR].y - lm[R_EL].y))/2/size
+    wristDrop: ((lm[L_WR].y - lm[L_EL].y) + (lm[R_WR].y - lm[R_EL].y))/2/size,
+    // hands swinging out away from the elbows - what rotating the thumbs looks like
+    wristSpread: (Math.abs(lm[L_WR].x - lm[L_EL].x) + Math.abs(lm[R_WR].x - lm[R_EL].x))/2/size
   };
 }
 
@@ -188,7 +192,7 @@ function mapper(){
   return p => ({x: ox+p.x*dw, y: oy+p.y*dh});
 }
 
-function draw(lm, col){
+function draw(lm, col, focus){
   ctx.clearRect(0,0,overlay.width,overlay.height);
   if(!lm) return;
   const bw=overlay.width;
@@ -203,11 +207,18 @@ function draw(lm, col){
     const p=M(lm[a]), q=M(lm[b]);
     ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(q.x,q.y); ctx.stroke();
   }
-  ctx.fillStyle=col;
   for(const i of [NOSE,L_SH,R_SH,L_EL,R_EL,L_WR,R_WR]){
     if((lm[i].visibility??1)<.35) continue;
     const p=M(lm[i]);
-    ctx.beginPath(); ctx.ellipse(p.x,p.y,7*dpr,5*dpr,0,0,Math.PI*2); ctx.fill();
+    const hot = focus && focus.includes(i);
+    ctx.fillStyle = hot ? "#ffb020" : col;
+    const r = hot ? 12*dpr : 7*dpr;
+    if(hot){
+      ctx.globalAlpha=.25;
+      ctx.beginPath(); ctx.ellipse(p.x,p.y,r*1.9,r*1.5,0,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha=1;
+    }
+    ctx.beginPath(); ctx.ellipse(p.x,p.y,r,r*0.72,0,0,Math.PI*2); ctx.fill();
   }
   ctx.restore();
 }
@@ -247,12 +258,19 @@ const GATES = {
     // Leaning back moves you away from the lens (narrower shoulders);
     // slumping drops your head toward them. Either counts, and we take
     // whichever signal is further along.
-    const back = 1 - f.size / n.size;
-    const sink = (n.neck - f.neck) / Math.max(n.neck, 1e-3);
-    const amt  = Math.max(back / 0.085, sink / 0.13);
-    return amt >= 1   ? {ok:true,  hint:"Hold it there."}
-         : amt >  0.4 ? {ok:false, hint:"Keep going - further back."}
-                      : {ok:false, hint:"Push back off the desk and sink into the chair."};
+    const back = 1 - f.size / n.size;                        // + = further from the lens
+    const sink = (n.neck - f.neck) / Math.max(n.neck, 1e-3); // + = head dropping
+    // Slumping forward also sinks the head, so refuse anything that is
+    // closer to the camera than the normal sit - otherwise leaning IN
+    // satisfies the lean-BACK step.
+    if(back < -0.015)
+      return {ok:false, hint:"That is forward - push back away from the screen.",
+              metric:`distance +${Math.round(-back*100)}% closer`};
+    const amt = Math.max(back / 0.085, sink / 0.13);
+    return amt >= 1   ? {ok:true,  hint:"Hold it there.",  metric:`back ${Math.round(back*100)}%`}
+         : amt >  0.4 ? {ok:false, hint:"Keep going - further back.", metric:`back ${Math.round(back*100)}% / need 9%`}
+                      : {ok:false, hint:"Push back off the desk and sink into the chair.",
+                         metric:`back ${Math.round(back*100)}% / need 9%`};
   },
 
   left: (f,n) => {
@@ -269,21 +287,18 @@ const GATES = {
                      : {ok:false, hint:"Drop your RIGHT shoulder."};
   },
 
-  // The target everything else is scored against. Distance is deliberately
-  // NOT checked here: this pose is captured with hands on the keyboard, so
-  // reaching forward is expected. Height and level are what matter.
+  // Captured straight after the tutorial, hands back on the keyboard.
+  // No distance and no height requirement - the tutorial just put them in
+  // position, so asking them to also measure taller made this unreachable.
+  // We only refuse a pose that is visibly tipped or still moving.
   ideal: (f,n,mo) => {
-    const h  = f.neck / Math.max(n.neck, 1e-3);
     const lv = Math.abs(f.tilt);
-    const ct = Math.abs(f.off);
     if(mo > 0.13)  return {ok:false, hint:"Hold still while we lock it in.", metric:`stillness ${mo.toFixed(2)} / 0.13`};
-    if(h < 1.02)   return {ok:false, hint:"Sit taller - lift your chest and lengthen your neck.", metric:`height ${h.toFixed(2)}x / need 1.02x`};
-    if(lv > 0.075) return {ok:false, hint: f.tilt > 0
+    if(lv > 0.090) return {ok:false, hint: f.tilt > 0
                              ? "Lift your LEFT shoulder - you are tipped over."
                              : "Lift your RIGHT shoulder - you are tipped over.",
-                           metric:`tilt ${lv.toFixed(3)} / max 0.075`};
-    if(ct > 0.15)  return {ok:false, hint:"Centre your head over your shoulders.", metric:`offset ${ct.toFixed(2)} / max 0.15`};
-    return {ok:true, hint:"That is the one. Hold it.", metric:`height ${h.toFixed(2)}x  tilt ${lv.toFixed(3)}`};
+                           metric:`tilt ${lv.toFixed(3)} / max 0.090`};
+    return {ok:true, hint:"Locking it in.", metric:`tilt ${lv.toFixed(3)}  held`};
   }
 };
 
@@ -295,15 +310,23 @@ function gateFor(ref, f, mo){
 }
 
 /* ===================== tutorial checks =================== */
+let armBase = null;   // wrist spread recorded once the elbows are pinned
+
 const CHECKS = {
   elbowsIn:      f => f.tuck < 0.42,
-  shouldersLevel:f => f.tuck < 0.50 && Math.abs(f.tilt) < 0.07,
+  // elbows stay pinned while the hands swing outward
+  rotateOut:     f => f.tuck < 0.58 && (armBase === null || f.wristSpread > armBase + 0.045),
   armsDown:      f => f.wristDrop > 0.25
 };
 const CHECK_HINT = {
   elbowsIn:"Bring your elbows closer to your ribs.",
-  shouldersLevel:"Level your shoulders - rotate further.",
+  rotateOut:"Keep the elbows pinned and swing your hands further out.",
   armsDown:"Let your hands hang below your elbows."
+};
+const CHECK_METRIC = {
+  elbowsIn: f => `elbows ${f.tuck.toFixed(2)} / need under 0.42`,
+  rotateOut:f => `rotation ${f.wristSpread.toFixed(2)}` + (armBase!==null?` / need ${(armBase+0.045).toFixed(2)}`:""),
+  armsDown: f => `hands ${f.wristDrop.toFixed(2)} / need over 0.25`
 };
 
 /* ======================= wizard UI ======================= */
@@ -325,13 +348,16 @@ function showStep(){
   img.hidden = !s.img;
   if(s.img && img.getAttribute("src") !== s.img) img.src = s.img;
 
-  $("wcue").hidden = !s.cue;
+  $("wcue").hidden = !s.cue || teaching;
   if(s.cue){ $("wcue").textContent = s.cue; $("wcue").classList.remove("ok"); }
 
-  const needsHold = s.kind==="capture" || s.kind==="tutorial";
+  teaching = !!s.teach; teachMs = 0;
+  document.querySelector(".wcard").classList.toggle("teaching", teaching);
+
+  const needsHold = (s.kind==="capture" || s.kind==="tutorial") && !teaching;
   $("holdwrap").hidden = !needsHold;
   $("holdfill").style.width = "0%";
-  $("wframing").hidden = !(s.kind==="frame" || s.kind==="capture");
+  $("wframing").hidden = teaching || !(s.kind==="frame" || s.kind==="capture");
 
   $("wPrimary").hidden = !s.btn;
   if(s.btn) $("wPrimary").textContent = s.btn;
@@ -345,6 +371,7 @@ function showStep(){
 }
 
 function nextStep(){
+  if(step().id === "t1" && prevFeat) armBase = prevFeat.wristSpread;
   stepIdx++;
   if(step().kind==="done" && !refs.ideal) refs.ideal = refs.normal;
   showStep();
@@ -363,6 +390,24 @@ function capture(f, id){
 function wizardTick(f, ok, dt){
   if(advancing) return;
   const s = step();
+
+  // Hold the illustration on screen first so the user reads the pose
+  // before anything starts counting.
+  if(teaching){
+    teachMs += dt;
+    const left = Math.ceil((s.teach - teachMs)/1000);
+    $("wmetric").hidden = false;
+    $("wmetric").textContent = `get into this position - ${left}s`;
+    if(teachMs >= s.teach){
+      teaching = false;
+      document.querySelector(".wcard").classList.remove("teaching");
+      $("holdwrap").hidden = false;
+      $("wcue").hidden = !s.cue;
+      $("wframing").hidden = !(s.kind==="frame" || s.kind==="capture");
+      holdMs = 0; gateFailMs = 0;
+    }
+    return;
+  }
 
   if(s.kind==="frame"){
     if(ok){ holdMs += dt; if(holdMs > 700) nextStep(); }
@@ -408,7 +453,9 @@ function wizardTick(f, ok, dt){
     if(!pass){
       tutorialHint += dt;
       if(tutorialHint > 2000) $("wcue").textContent = CHECK_HINT[s.check];
-      $("wmetric").hidden = true;
+      $("wmetric").hidden = !f;
+      if(f && CHECK_METRIC[s.check]) $("wmetric").textContent = CHECK_METRIC[s.check](f);
+      if(tutorialHint > (s.relaxMs || 9000)) holdMs += dt;   // never strand anyone
     } else {
       const left = Math.ceil((need-holdMs)/1000);
       $("wcue").textContent = s.holdText || "That's it. Hold.";
@@ -597,7 +644,7 @@ function loop(){
     col = "#6f6762";
   }
 
-  draw(smoothLm, col);
+  draw(smoothLm, col, !live && step().kind==="tutorial" ? FOCUS[step().check] : null);
 }
 function fmt(ms){ const s=Math.floor(ms/1000); return `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`; }
 
@@ -644,7 +691,7 @@ $("wSkip").addEventListener("click", ()=>{
 
 $("tutorialBtn").addEventListener("click", ()=> backToWizard(STEPS.findIndex(s=>s.id==="t1")));
 $("recalBtn").addEventListener("click", ()=>{
-  refs = {}; spread = null; scoreEMA = null;
+  refs = {}; spread = null; scoreEMA = null; armBase = null;
   backToWizard(STEPS.findIndex(s=>s.id==="normal"));
 });
 $("resetBtn").addEventListener("click", ()=>{
