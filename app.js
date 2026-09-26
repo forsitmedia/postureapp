@@ -73,24 +73,24 @@ const STEPS = [
     body:"Same thing, mirrored. Drop your right shoulder and lean right.",
     cue:"Right shoulder down." },
 
-  { id:"t1", kind:"tutorial", check:"elbowsIn",
+  { id:"t1", img:"assets/tutorial/step1.png", kind:"tutorial", check:"elbowsIn",
     title:"Elbows to your sides",
     body:"Bring both elbows in until they're <b>touching your sides</b>. Thumbs pointing outward.",
     cue:"Elbows in, thumbs out." },
 
-  { id:"t2", kind:"tutorial", check:"shouldersLevel",
+  { id:"t2", img:"assets/tutorial/step2.png", kind:"tutorial", check:"shouldersLevel",
     title:"Rotate your thumbs out",
     body:"Keep your elbows pinned to your sides and rotate your thumbs outward <b>as far as they'll go</b>. Your shoulders will pull back and even out on their own.",
     cue:"As far as you can. Elbows stay put." },
 
-  { id:"t3", kind:"tutorial", check:"armsDown",
+  { id:"t3", img:"assets/tutorial/step3.png", kind:"tutorial", check:"armsDown",
     title:"Now drop your arms",
     body:"Let your arms fall loose, but <b>keep your chest and shoulders exactly where they are</b>.",
     cue:"Arms down. Chest stays open." },
 
-  { id:"ideal", kind:"capture", ref:"ideal", relaxMs:16000,
+  { id:"ideal", img:"assets/tutorial/step4.png", kind:"capture", ref:"ideal", relaxMs:16000,
     title:"That's your position. Hold it.",
-    body:"This is what we'll hold you to for the rest of the session.",
+    body:"Put your hands back on the keyboard and keep the chest and shoulders you just built. This is what we'll hold you to.",
     cue:"Shoulders level, chest open, head stacked." },
 
   { id:"done", kind:"done",
@@ -271,14 +271,14 @@ const GATES = {
   // The target everything else is scored against, so this one is strict:
   // it must be measurably better than the normal sit on every axis.
   ideal: (f,n,mo) => {
-    if(mo > 0.075)              return {ok:false, hint:"Hold still while we lock it in."};
-    if(f.size > n.size * 1.06)  return {ok:false, hint:"Sit back - you are leaning into the screen."};
+    if(mo > 0.095)              return {ok:false, hint:"Hold still while we lock it in."};
+    if(f.size > n.size * 1.12)  return {ok:false, hint:"Sit back - you are leaning into the screen."};
     if(f.size < n.size * 0.90)  return {ok:false, hint:"Come forward - you are slumped back."};
-    if(f.neck < n.neck * 1.05)  return {ok:false, hint:"Sit taller - lift your chest and lengthen your neck."};
-    if(Math.abs(f.tilt) > 0.05) return {ok:false, hint: f.tilt > 0
+    if(f.neck < n.neck * 1.03)  return {ok:false, hint:"Sit taller - lift your chest and lengthen your neck."};
+    if(Math.abs(f.tilt) > 0.06) return {ok:false, hint: f.tilt > 0
                                           ? "Lift your LEFT shoulder - you are tipped over."
                                           : "Lift your RIGHT shoulder - you are tipped over."};
-    if(Math.abs(f.off) > 0.11)  return {ok:false, hint:"Centre your head over your shoulders."};
+    if(Math.abs(f.off) > 0.13)  return {ok:false, hint:"Centre your head over your shoulders."};
     return {ok:true, hint:"That is the one. Hold it."};
   }
 };
@@ -314,6 +314,10 @@ function showStep(){
   $("wstep").textContent = `Step ${stepIdx+1} of ${STEPS.length}`;
   $("wtitle").textContent = s.title;
   $("wbody").innerHTML = s.body;
+
+  const img = $("wimg");
+  img.hidden = !s.img;
+  if(s.img && img.getAttribute("src") !== s.img) img.src = s.img;
 
   $("wcue").hidden = !s.cue;
   if(s.cue){ $("wcue").textContent = s.cue; $("wcue").classList.remove("ok"); }
