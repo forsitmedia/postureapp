@@ -15,7 +15,7 @@ const dist  = (a,b) => Math.hypot(a.x-b.x, a.y-b.y);
 
 const video = $("video"), overlay = $("overlay"), ctx = overlay.getContext("2d");
 
-const NOSE=0, L_EAR=7, R_EAR=8, L_SH=11, R_SH=12, L_EL=13, R_EL=14, L_WR=15, R_WR=16;
+const NOSE=0, L_EAR=7, R_EAR=8, MOUTH_L=9, MOUTH_R=10, L_SH=11, R_SH=12, L_EL=13, R_EL=14, L_WR=15, R_WR=16;
 const FOCUS = { elbowsIn:[L_EL,R_EL], rotateOut:[L_EL,R_EL,L_WR,R_WR], armsDown:[L_WR,R_WR] };
 const SKELETON=[[L_SH,R_SH],[L_SH,L_EL],[R_SH,R_EL],[L_EL,L_WR],[R_EL,R_WR],
                 [NOSE,L_SH],[NOSE,R_SH],[L_EAR,NOSE],[R_EAR,NOSE]];
@@ -40,8 +40,8 @@ const LEVELS = [
   { name:"Human",        icon:"\u{1F9CD}", min:61 },
   { name:"Statue",       icon:"\u{1F5FF}", min:81 }
 ];
-const GAIN = 1/2200;   // a point per 2.2s of good posture
-const LOSS = 4;        // points forfeited per alert
+const GAIN = 1/12000;  // a point per 12s of good posture - Statue is ~16 minutes
+const LOSS = 6;        // points forfeited per alert
 
 function levelFor(p){
   let i = 0;
@@ -99,23 +99,23 @@ const STEPS = [
     body:"Now the other side. Drop your <b>right</b> shoulder.",
     cue:"Right shoulder down." },
 
-  { id:"t1", ready:"hand", teach:3000, img:"assets/tutorial/step1.png", kind:"tutorial", check:"elbowsIn", hold:2800,
+  { id:"t1", ready:"smile", teach:3000, img:"assets/tutorial/step1.png", kind:"tutorial", check:"elbowsIn", hold:2800,
     title:"Elbows to your sides",
     body:"Elbows in until they <b>touch your sides</b>. Thumbs out.",
     cue:"Elbows in, thumbs out." },
 
-  { id:"t2", ready:"hand", teach:3000, img:"assets/tutorial/step2.png", kind:"tutorial", check:"rotateOut",
+  { id:"t2", ready:"smile", teach:3000, img:"assets/tutorial/step2.png", kind:"tutorial", check:"rotateOut",
     hold:9000, holdText:"Keep rotating - hold it open.",
     title:"Rotate your thumbs out",
     body:"Elbows pinned. Rotate your thumbs outward <b>as far as they go</b>.",
     cue:"As far as you can. Elbows stay put." },
 
-  { id:"t3", ready:"hand", teach:3000, img:"assets/tutorial/step3.png", kind:"tutorial", check:"armsDown", hold:2800,
+  { id:"t3", ready:"smile", teach:3000, img:"assets/tutorial/step3.png", kind:"tutorial", check:"armsDown", hold:2800,
     title:"Now drop your arms",
     body:"Let your arms fall. <b>Keep your chest where it is.</b>",
     cue:"Arms down. Chest stays open." },
 
-  { id:"ideal", ready:"hand", teach:3000, img:"assets/tutorial/step4.png", kind:"capture", ref:"ideal", relaxMs:14000, hold:2600,
+  { id:"ideal", ready:"smile", teach:3000, img:"assets/tutorial/step4.png", kind:"capture", ref:"ideal", relaxMs:9000, hold:2600,
     title:"That's your position. Hold it.",
     body:"Hands back on the keyboard. Keep this position.",
     cue:"Shoulders level, chest open, head stacked." },
@@ -163,9 +163,12 @@ function features(lm){
     wristDrop: ((lm[L_WR].y - lm[L_EL].y) + (lm[R_WR].y - lm[R_EL].y))/2/size,
     // hands swinging out away from the elbows - what rotating the thumbs looks like
     wristSpread: (Math.abs(lm[L_WR].x - lm[L_EL].x) + Math.abs(lm[R_WR].x - lm[R_EL].x))/2/size,
-    // either wrist lifted clearly above the shoulder line
-    handUp: ((lm[L_WR].visibility ?? 1) > .4 && lm[L_WR].y < ls.y - size*0.15) ||
-            ((lm[R_WR].visibility ?? 1) > .4 && lm[R_WR].y < rs.y - size*0.15)
+    // mouth width against head width. The pose model gives only the two
+    // mouth corners - there are no lip landmarks - so a smile is visible
+    // as the corners spreading, while an open mouth is not visible at all.
+    mouth: dist(lm[MOUTH_L], lm[MOUTH_R]) / Math.max(dist(lm[L_EAR], lm[R_EAR]), 1e-4),
+    // both wrists gone from the frame usually means the arms have dropped
+    wristsGone: (lm[L_WR].visibility ?? 1) < .35 && (lm[R_WR].visibility ?? 1) < .35
   };
 }
 
@@ -336,11 +339,11 @@ const GATES = {
   // We only refuse a pose that is visibly tipped or still moving.
   ideal: (f,n,mo) => {
     const lv = Math.abs(f.tilt);
-    if(mo > 0.13)  return {ok:false, hint:"Hold still while we lock it in.", metric:`stillness ${mo.toFixed(2)} / 0.13`};
-    if(lv > 0.090) return {ok:false, hint: f.tilt > 0
+    if(mo > 0.18)  return {ok:false, hint:"Hold still while we lock it in.", metric:`stillness ${mo.toFixed(2)} / 0.18`};
+    if(lv > 0.110) return {ok:false, hint: f.tilt > 0
                              ? "Lift your LEFT shoulder - you are tipped over."
                              : "Lift your RIGHT shoulder - you are tipped over.",
-                           metric:`tilt ${lv.toFixed(3)} / max 0.090`};
+                           metric:`tilt ${lv.toFixed(3)} / max 0.110`};
     return {ok:true, hint:"Locking it in.", metric:`tilt ${lv.toFixed(3)}  held`};
   }
 };
@@ -353,13 +356,14 @@ function gateFor(ref, f, mo){
 }
 
 /* ===================== tutorial checks =================== */
-let armBase = null;   // wrist spread recorded once the elbows are pinned
+let armBase = null;    // wrist spread recorded once the elbows are pinned
+let mouthBase = null;  // resting mouth width, measured on the normal sit
 
 const CHECKS = {
   elbowsIn:      f => f.tuck < 0.42,
   // elbows stay pinned while the hands swing outward
   rotateOut:     () => true,   // not observable from pose landmarks - timed instead
-  armsDown:      f => f.wristDrop > 0.25
+  armsDown:      f => f.wristDrop > 0.12 || f.wristsGone
 };
 const CHECK_HINT = {
   elbowsIn:"Bring your elbows closer to your ribs.",
@@ -369,7 +373,7 @@ const CHECK_HINT = {
 const CHECK_METRIC = {
   elbowsIn: f => `elbows ${f.tuck.toFixed(2)} / need under 0.42`,
   rotateOut:() => "",
-  armsDown: f => `hands ${f.wristDrop.toFixed(2)} / need over 0.25`
+  armsDown: f => f.wristsGone ? "arms out of frame - fine" : `hands ${f.wristDrop.toFixed(2)} / need over 0.12`
 };
 
 /* ======================= wizard UI ======================= */
@@ -439,6 +443,7 @@ function nextStep(){
 
 function capture(f, id){
   advancing = true;
+  if(id === "normal") mouthBase = f.mouth;   // their neutral face
   refs[id] = {...f};
   buildSpread();
   $("wcue").classList.add("ok");
@@ -457,17 +462,20 @@ function wizardTick(f, ok, dt){
     // Steps that ask for a real body position wait for the user to say
     // they are ready by lifting a hand, rather than starting on a timer
     // they may not have finished reading.
-    if(s.ready === "hand"){
-      const up = !!(f && f.handUp);
+    if(s.ready === "smile"){
+      const r  = f ? f.mouth : 0;
+      const up = !!(f && mouthBase && r > mouthBase * 1.06);
       $("wmetric").hidden = false;
-      $("wmetric").textContent = up ? "got it - hand down and get set" : "raise a hand when you have read this";
+      $("wmetric").textContent = mouthBase
+        ? `smile ${(r/mouthBase).toFixed(2)}x / need 1.06x`
+        : "press start when you are ready";
       $("wcue").hidden = false;
       $("wcue").classList.toggle("ok", up);
-      $("wcue").textContent = up ? "Ready." : "Raise a hand to start";
+      $("wcue").textContent = up ? "Ready." : "Smile at the camera to start";
       $("wSkip").hidden = false;
       $("wSkip").textContent = "Start now";
       teachMs = up ? teachMs + dt : 0;
-      if(teachMs < 500) return;          // a brief hold, so a passing gesture does not count
+      if(teachMs < 400) return;          // brief hold, so a flicker does not count
     } else {
       teachMs += dt;
       const left = Math.ceil((s.teach - teachMs)/1000);
@@ -475,7 +483,7 @@ function wizardTick(f, ok, dt){
       $("wmetric").textContent = `get into this position - ${left}s`;
     }
 
-    if(s.ready === "hand" || teachMs >= s.teach){
+    if(s.ready === "smile" || teachMs >= s.teach){
       teaching = false;
       document.querySelector(".wcard").classList.remove("teaching");
       $("holdwrap").hidden = false;
@@ -910,7 +918,7 @@ $("wSkip").addEventListener("click", ()=>{
 
 $("tutorialBtn").addEventListener("click", ()=> backToWizard(STEPS.findIndex(s=>s.id==="t1")));
 $("recalBtn").addEventListener("click", ()=>{
-  refs = {}; spread = null; scoreEMA = null; armBase = null;
+  refs = {}; spread = null; scoreEMA = null; armBase = null; mouthBase = null;
   turnRange = 0; sweepL = 0; sweepR = 0;
   backToWizard(STEPS.findIndex(s=>s.id==="normal"));
 });
