@@ -87,6 +87,7 @@ body{
 .wdots i.now{background:var(--accent);width:16px}
 
 /* steps where the user moves their body need the frame, not the caption */
+.wizard.center{align-items:center}
 .wizard.top{align-items:flex-start;padding-top:max(20px, env(safe-area-inset-top, 0px))}
 
 /* ================= dashboard ================= */
@@ -166,3 +167,44 @@ h1 .ver{color:var(--dim);font-weight:500}
 
 /* the hidden attribute must beat every display rule above */
 [hidden]{display:none !important}
+
+/* ================= landing hero ================= */
+.hero{margin:0;flex:none;width:clamp(180px,24vw,260px);position:relative}
+.hero img{width:100%;display:block;border-radius:16px;filter:grayscale(.15) contrast(1.05)}
+.hero figcaption{
+  position:absolute;left:0;right:0;bottom:0;padding:26px 10px 10px;
+  font-weight:800;font-size:clamp(14px,1.5vw,17px);letter-spacing:.02em;
+  text-transform:uppercase;color:#fff;text-align:center;border-radius:0 0 16px 16px;
+  background:linear-gradient(transparent,rgba(120,30,10,.92));
+}
+.wcard.landing{flex-direction:row;align-items:center;gap:30px;text-align:left;padding:26px 30px}
+.wcard.landing .wcontent{text-align:left}
+.wcard.landing .wbody{margin-left:0;max-width:46ch}
+.wcard.landing .wbtns{justify-content:flex-start}
+@media (max-width:720px){
+  .wcard.landing{flex-direction:column;text-align:center;gap:18px}
+  .wcard.landing .wcontent,.wcard.landing .wbody{text-align:center}
+  .wcard.landing .wbtns{justify-content:center}
+  .hero{width:min(220px,60vw)}
+}
+
+/* ================= the shrimp scale ================= */
+.scale{display:flex;gap:7px;margin-top:18px;flex-wrap:wrap}
+.tier{
+  flex:1 1 92px;min-width:82px;background:var(--panel2);border:1px solid var(--line);
+  border-radius:11px;padding:9px 8px;text-align:center;
+}
+.ticon{font-size:20px;display:block;line-height:1.1;margin-bottom:3px}
+.tier b{display:block;font-size:11px;font-weight:700;line-height:1.25}
+.tier i{display:block;font-style:normal;font-size:10px;color:var(--dim);margin-top:2px;font-variant-numeric:tabular-nums}
+.tier:first-child{border-color:rgba(255,77,77,.4)}
+.tier:last-child{border-color:rgba(61,220,151,.4)}
+
+/* ================= rank panel ================= */
+.rank{display:flex;align-items:center;gap:12px;margin-bottom:11px}
+.rankicon{font-size:34px;line-height:1}
+.rankname{font-size:17px;font-weight:800;letter-spacing:-.01em}
+.rankpts{font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums;margin-top:1px}
+.rankbar{height:7px;background:var(--panel2);border-radius:99px;overflow:hidden;border:1px solid var(--line)}
+.rankfill{height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--good));border-radius:99px;transition:width .4s}
+.ranknext{font-size:11px;color:var(--dim);margin-top:7px;letter-spacing:.04em}

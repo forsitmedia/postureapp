@@ -30,6 +30,25 @@ const BAD_LABELS = {
   right:"Collapsed to the right"
 };
 
+/* Points build while you hold a good score and take a hit on every
+   alert, so the rank is earned over a session rather than mirroring
+   the live number. */
+const LEVELS = [
+  { name:"Full Shrimp",  icon:"\u{1F990}", min:0  },
+  { name:"Gargoyle",     icon:"\u{1F987}", min:21 },
+  { name:"Office Goblin",icon:"\u{1F47A}", min:41 },
+  { name:"Human",        icon:"\u{1F9CD}", min:61 },
+  { name:"Statue",       icon:"\u{1F5FF}", min:81 }
+];
+const GAIN = 1/2200;   // a point per 2.2s of good posture
+const LOSS = 4;        // points forfeited per alert
+
+function levelFor(p){
+  let i = 0;
+  for(let k=0;k<LEVELS.length;k++) if(p >= LEVELS[k].min) i = k;
+  return i;
+}
+
 const JEERS = [
   "I blinked and you became seafood. Fix it.",
   "That's a prawn posture. Straighten up.",
@@ -117,6 +136,7 @@ let goodMs=0, nagMoveMs=0, lastNagPos=null;
 let prevFeat=null, motionEMA=0, gateFailMs=0;
 let teaching=false, teachMs=0;
 let turnRange=0, sweepL=0, sweepR=0;
+let points=0, lastLevel=0;
 
 const HOLD = 2400, COOLDOWN = 1200;   // short re-arm; the nag clears itself on recovery
 const RECOVER_MS = 600;               // how long you must look good before it lets go
@@ -359,8 +379,17 @@ function showStep(){
   if(s.kind === 'sweep'){ sweepL = 0; sweepR = 0; }
   const landing = s.kind === "intro";
   document.querySelector(".wcard").classList.toggle("landing", landing);
+  $("wizard").classList.toggle("center", landing);
   $("wstep").hidden = landing;
   $("wdots").hidden = landing;
+  $("hero").hidden  = !landing;
+  $("scale").hidden = !landing;
+  if(landing && !$("scale").dataset.built){
+    $("scale").innerHTML = LEVELS.map(L =>
+      `<div class="tier"><span class="ticon">${L.icon}</span><b>${L.name}</b>
+       <i>${L.min}\u2013${L===LEVELS[LEVELS.length-1] ? 100 : LEVELS[LEVELS.indexOf(L)+1].min-1}</i></div>`).join("");
+    $("scale").dataset.built = "1";
+  }
   $("wtag").hidden  = !s.tagline;
   if(s.tagline) $("wtag").textContent = s.tagline;
   $("wstep").textContent = `Step ${stepIdx} of ${STEPS.length-1}`;
@@ -604,6 +633,7 @@ function placeNag(){
 
 function showNag(){
   alerting = true; alerts++; nagMoveMs = 0; goodMs = 0;
+  points = clamp(points - LOSS, 0, 100);
   $("stAlerts").textContent = alerts;
   $("warntext").textContent = JEERS[Math.floor(Math.random()*JEERS.length)];
 
@@ -624,6 +654,33 @@ function hideNag(){
   el.classList.add("out");
   setTimeout(()=>{ el.hidden = true; }, 250);
   alerting = false; badMs = 0; goodMs = 0; cooldownMs = COOLDOWN;
+}
+
+function renderRank(){
+  const i = levelFor(points);
+  const L = LEVELS[i], next = LEVELS[i+1];
+  $("rankIcon").textContent = L.icon;
+  $("rankName").textContent = L.name;
+  $("rankPts").textContent  = Math.floor(points) + " pts";
+
+  const from = L.min, to = next ? next.min : 100;
+  $("rankFill").style.width = clamp((points-from)/Math.max(to-from,1),0,1)*100 + "%";
+  $("rankNext").textContent = next
+    ? Math.ceil(next.min - points) + " pts to " + next.name
+    : "Top rank. Hold it.";
+
+  if(i !== lastLevel){
+    const up = i > lastLevel;
+    lastLevel = i;
+    toastRank((up ? "Ranked up: " : "Dropped to ") + L.icon + "  " + L.name);
+  }
+}
+
+let rankToastAt = 0;
+function toastRank(msg){
+  const t = $("toast");
+  t.textContent = msg; t.hidden = false;
+  rankToastAt = performance.now() + 2600;
 }
 
 /* ========================= loop ========================== */
@@ -688,8 +745,11 @@ function loop(){
     dg.className = "diagnosis " + (good?"good":"bad");
 
     sessionMs += dt;
-    if(good){ uprightMs+=dt; streakMs+=dt; bestStreak=Math.max(bestStreak,streakMs); }
-    else streakMs = 0;
+    if(good){
+      uprightMs += dt; streakMs += dt; bestStreak = Math.max(bestStreak, streakMs);
+      points = clamp(points + dt*GAIN, 0, 100);
+    } else streakMs = 0;
+    renderRank();
 
     if(cooldownMs>0) cooldownMs -= dt;
 
@@ -773,6 +833,7 @@ $("recalBtn").addEventListener("click", ()=>{
 });
 $("resetBtn").addEventListener("click", ()=>{
   sessionMs=uprightMs=alerts=streakMs=bestStreak=badMs=0; cooldownMs=0; scoreEMA=null;
+  points=0; lastLevel=0; renderRank();
   $("stUpright").textContent="0%"; $("stSession").textContent="0:00";
   $("stAlerts").textContent="0"; $("stStreak").textContent="0:00";
 });

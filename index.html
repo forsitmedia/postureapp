@@ -26,6 +26,10 @@
 <div class="wizard" id="wizard">
   <div class="wcard">
     <img class="wimg" id="wimg" hidden alt="">
+    <figure class="hero" id="hero" hidden>
+      <img src="assets/meme.png" alt="Someone hunched over a phone">
+      <figcaption>Fix your posture</figcaption>
+    </figure>
     <div class="wcontent">
     <div class="wstep" id="wstep">Step 1 of 13</div>
     <h1 class="wtitle" id="wtitle">Sit Happens</h1>
@@ -48,6 +52,7 @@
       <button class="btn ghost" id="wSkip" hidden>Skip this</button>
     </div>
 
+    <div class="scale" id="scale" hidden></div>
     <div class="wdots" id="wdots"></div>
     </div>
   </div>
@@ -82,6 +87,19 @@
     </section>
 
     <aside class="side">
+      <div class="panel rankpanel">
+        <h2>Your rank</h2>
+        <div class="rank">
+          <div class="rankicon" id="rankIcon">&#129424;</div>
+          <div class="rankmeta">
+            <div class="rankname" id="rankName">Full Shrimp</div>
+            <div class="rankpts" id="rankPts">0 pts</div>
+          </div>
+        </div>
+        <div class="rankbar"><div class="rankfill" id="rankFill"></div></div>
+        <div class="ranknext" id="rankNext">21 pts to Gargoyle</div>
+      </div>
+
       <div class="panel">
         <h2>What you're doing</h2>
         <div class="diagnosis" id="diagnosis">Calibrating...</div>
