@@ -555,55 +555,72 @@ function renderFaults(am, worst){
 }
 
 /* ==================== floating window =====================
-   Document Picture-in-Picture is the only way a page can put
-   anything above other applications. Two limits shape this:
-   the browser owns the window's position, so it cannot be moved
-   around the screen, and opening one normally wants a user
-   gesture. So we try to open on each slouch and fall back to the
-   in-page nag, which can roam freely, whenever that is refused.
+   Document Picture-in-Picture needs a fresh user gesture, so it can
+   only be opened from a click - not later, when the user slouches.
+   The window therefore opens once on the click that starts tracking
+   and stays for the session, sitting dark and quiet until it is
+   needed. The real <video> element is MOVED into it rather than
+   copied, which is what carries its audio permission across; a fresh
+   element in that document would be refused and fall back to muted.
    ========================================================= */
 const PIP_OK = typeof documentPictureInPicture !== "undefined";
-let pipDenied = false;
+let warnVid = $("warnvid");          // keep a handle: the node moves between documents
+let pipIdle = null;
 
-async function showPip(){
-  if(!PIP_OK || pipDenied || pipWin) return false;
-  if(!$("pipOn").checked) return false;
+/* Playing once inside the click marks the element as user-activated,
+   so every later programmatic play is allowed to carry sound. */
+function primeAudio(){
+  const v = warnVid, vol = v.volume;
+  v.volume = 0;
+  const p = v.play();
+  if(p && p.then) p.then(()=>{ v.pause(); v.currentTime = 0; v.volume = vol; })
+                   .catch(()=>{ v.volume = vol; });
+}
+
+async function openPip(){
+  if(!PIP_OK || pipWin || !$("pipOn").checked) return;
   try{
-    pipWin = await documentPictureInPicture.requestWindow({width:320, height:210});
+    pipWin = await documentPictureInPicture.requestWindow({width:320, height:220});
   }catch(e){
-    pipDenied = true;
-    $("pipHint").textContent = "Chrome would not float a window without a click. Using the in-page popup instead.";
+    $("pipHint").textContent = "Chrome refused the floating window. The in-page popup will be used.";
     $("pipHint").classList.add("warn");
-    return false;
+    return;
   }
 
   const d = pipWin.document;
-  d.body.style.cssText = "margin:0;background:#000;overflow:hidden;display:flex;"+
-    "flex-direction:column;height:100vh;font:13px/1.35 -apple-system,BlinkMacSystemFont,system-ui,sans-serif";
+  d.body.style.cssText = "margin:0;background:#0a0908;overflow:hidden;display:flex;"+
+    "flex-direction:column;height:100vh;font:12px/1.4 -apple-system,BlinkMacSystemFont,system-ui,sans-serif";
 
-  const vid = d.createElement("video");
-  vid.src = new URL("assets/warning.mp4", location.href).href;
-  vid.loop = true; vid.playsInline = true;
-  vid.style.cssText = "flex:1;width:100%;object-fit:cover;background:#000";
+  const idle = d.createElement("div");
+  idle.style.cssText = "flex:1;display:flex;align-items:center;justify-content:center;"+
+    "color:#4a433f;letter-spacing:.22em;text-transform:uppercase;font-size:10px";
+  idle.textContent = "watching";
 
   const jeer = d.createElement("div");
-  jeer.style.cssText = "padding:8px 10px;background:#121110;color:#ff4d4d;font-weight:700;text-align:center";
-  jeer.textContent = $("warntext").textContent;
+  jeer.style.cssText = "padding:8px 10px;background:#121110;color:#ff4d4d;font-weight:700;"+
+    "text-align:center;display:none";
 
-  d.body.append(vid, jeer);
-  pipEls = {vid, jeer};
+  warnVid.style.cssText = "flex:1;width:100%;object-fit:cover;background:#000;display:none";
+  d.body.append(idle, warnVid, jeer);
+  pipEls = {idle, jeer};
+  pipIdle = idle;
 
-  vid.muted = !$("soundOn").checked;
-  vid.play().catch(()=>{ vid.muted = true; vid.play().catch(()=>{}); });
+  $("pipHint").textContent = "Floating on top. It stays dark until you shrimp.";
+  $("pipHint").classList.remove("warn");
 
-  pipWin.addEventListener("pagehide", ()=>{ pipWin=null; pipEls=null; });
-  return true;
+  pipWin.addEventListener("pagehide", ()=>{
+    // bring the player home so the in-page popup still works
+    const box = $("nag");
+    warnVid.style.cssText = "";
+    box.insertBefore(warnVid, box.firstChild);
+    pipWin = null; pipEls = null; pipIdle = null;
+    $("pipHint").textContent = "Floating window closed. Using the in-page popup.";
+  });
 }
 
 function closePip(){
   if(!pipWin) return;
   try{ pipWin.close(); }catch(e){}
-  pipWin = null; pipEls = null;
 }
 
 /* ========================== nag =========================== */
@@ -636,30 +653,40 @@ function showNag(){
   $("stAlerts").textContent = alerts;
   $("warntext").textContent = JEERS[Math.floor(Math.random()*JEERS.length)];
 
-  const el = $("nag");
-  el.classList.remove("out");
-  el.hidden = false;
-  placeNag();
+  warnVid.currentTime = 0;
+  warnVid.muted = !$("soundOn").checked;
 
-  const v = $("warnvid");
-  v.currentTime = 0;
-  v.muted = !$("soundOn").checked;
-  v.play().catch(()=>{ v.muted = true; v.play().catch(()=>{}); });
+  if(pipEls){
+    // floating window: wake it up
+    pipEls.idle.style.display = "none";
+    pipEls.jeer.style.display = "block";
+    pipEls.jeer.textContent = $("warntext").textContent;
+    warnVid.style.display = "block";
+  } else {
+    // in-page popup: lands somewhere new each time
+    const el = $("nag");
+    el.classList.remove("out");
+    el.hidden = false;
+    placeNag();
+  }
 
-  // If the floating window opens, it replaces the in-page popup so the
-  // user is not shouted at twice.
-  showPip().then(opened => {
-    if(opened && alerting){ el.classList.add("out"); setTimeout(()=>{ if(alerting) el.hidden = true; }, 250); $("warnvid").pause(); }
-  });
+  warnVid.play().catch(()=>{ warnVid.muted = true; warnVid.play().catch(()=>{}); });
 }
 
 function hideNag(){
-  const el = $("nag");
-  el.classList.add("out");
-  setTimeout(()=>{ el.hidden = true; $("warnvid").pause(); }, 250);
-  alerting = false; badMs = 0; goodMs = 0; cooldownMs = COOLDOWN;
+  warnVid.pause();
 
-  closePip();
+  if(pipEls){
+    warnVid.style.display = "none";
+    pipEls.jeer.style.display = "none";
+    pipEls.idle.style.display = "flex";
+  } else {
+    const el = $("nag");
+    el.classList.add("out");
+    setTimeout(()=>{ el.hidden = true; }, 250);
+  }
+
+  alerting = false; badMs = 0; goodMs = 0; cooldownMs = COOLDOWN;
 }
 
 /* ========================= loop ========================== */
@@ -735,7 +762,7 @@ function loop(){
       else{
         goodMs = 0;
         nagMoveMs += dt;
-        if(nagMoveMs > 7000){ nagMoveMs = 0; placeNag(); }   // keep moving if ignored
+        if(!pipEls && nagMoveMs > 7000){ nagMoveMs = 0; placeNag(); }   // keep moving if ignored
       }
     } else if(!good){
       badMs += dt;                                      // counts during re-arm too
@@ -792,7 +819,7 @@ async function startCamera(){
 $("wPrimary").addEventListener("click", ()=>{
   const s = step();
   if(s.kind==="intro") startCamera();
-  else if(s.kind==="done") goLive();
+  else if(s.kind==="done"){ primeAudio(); goLive(); openPip(); }   // the click is the gesture both need
 });
 
 $("wSkip").addEventListener("click", ()=>{
