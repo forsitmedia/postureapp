@@ -106,8 +106,9 @@ let sessionMs=0, uprightMs=0, alerts=0, streakMs=0, bestStreak=0;
 let badMs=0, alerting=false, cooldownMs=0, live=false, tutorialHint=0;
 let advancing=false;   // latch: stop the loop re-firing a step while it advances
 let goodMs=0, nagMoveMs=0, lastNagPos=null;
+let prevFeat=null, motionEMA=0, gateFailMs=0;
 
-const HOLD = 1700, COOLDOWN = 1200;   // short re-arm; the nag clears itself on recovery
+const HOLD = 2400, COOLDOWN = 1200;   // short re-arm; the nag clears itself on recovery
 const RECOVER_MS = 600;               // how long you must look good before it lets go
 const step = () => STEPS[stepIdx];
 
@@ -222,6 +223,60 @@ function framing(lm){
   return nose && sh && dOk;
 }
 
+/* ======================== gates ==========================
+   A capture step only starts filling once the user is actually
+   doing the pose it asked for. Each gate reports whether the
+   pose is reached and, if not, what to change. Gates compare
+   against the user's own normal sit, so they scale to the body
+   in front of the camera rather than to fixed numbers.
+   ========================================================= */
+const GATES = {
+  normal: (f,n,mo) => mo < 0.055
+    ? {ok:true,  hint:"Hold still."}
+    : {ok:false, hint:"Settle down and hold still."},
+
+  close: (f,n) => {
+    const r = f.size / n.size;                       // wider shoulders = nearer the lens
+    return r > 1.10 ? {ok:true,  hint:"Hold it there."}
+         : r > 1.04 ? {ok:false, hint:"Closer - keep leaning in."}
+                    : {ok:false, hint:"Lean toward the screen."};
+  },
+
+  down: (f,n) => {
+    const d = (n.neck - f.neck) / Math.max(n.neck, 1e-3);   // head sinking toward shoulders
+    return d > 0.14 ? {ok:true,  hint:"Hold it there."}
+         : d > 0.06 ? {ok:false, hint:"More - let your head sink."}
+                    : {ok:false, hint:"Slump down, chin toward your chest."};
+  },
+
+  left: (f,n) => {
+    const t = f.tilt - n.tilt;
+    return t > 0.085 ? {ok:true,  hint:"Hold it there."}
+         : t > 0.040 ? {ok:false, hint:"A little further."}
+                     : {ok:false, hint:"Drop your LEFT shoulder."};
+  },
+
+  right: (f,n) => {
+    const t = n.tilt - f.tilt;
+    return t > 0.085 ? {ok:true,  hint:"Hold it there."}
+         : t > 0.040 ? {ok:false, hint:"A little further."}
+                     : {ok:false, hint:"Drop your RIGHT shoulder."};
+  },
+
+  ideal: (f,n) => {
+    if(f.neck < n.neck * 0.99) return {ok:false, hint:"Lift your chest - sit taller than your normal slouch."};
+    if(Math.abs(f.tilt) > 0.075) return {ok:false, hint:"Level your shoulders."};
+    return {ok:true, hint:"That's the one. Hold it."};
+  }
+};
+
+function gateFor(ref, f, mo){
+  const g = GATES[ref];
+  if(!g || !f) return {ok:false, hint:"Get your head and shoulders in frame."};
+  if(ref !== "normal" && !refs.normal) return {ok:true, hint:"Hold it."};
+  return g(f, refs.normal, mo);
+}
+
 /* ===================== tutorial checks =================== */
 const CHECKS = {
   elbowsIn:      f => f.tuck < 0.42,
@@ -242,7 +297,7 @@ function renderDots(){
 
 function showStep(){
   const s = step();
-  holdMs = 0; tutorialHint = 0; advancing = false;
+  holdMs = 0; tutorialHint = 0; advancing = false; gateFailMs = 0;
   $("wstep").textContent = `Step ${stepIdx+1} of ${STEPS.length}`;
   $("wtitle").textContent = s.title;
   $("wbody").innerHTML = s.body;
@@ -293,24 +348,27 @@ function wizardTick(f, ok, dt){
   }
 
   if(s.kind==="capture"){
-    if(!ok || !f){ holdMs = Math.max(0, holdMs - dt*1.5); }
-    else holdMs += dt;
-    $("holdfill").style.width = `${clamp(holdMs/HOLD,0,1)*100}%`;
+    const g = gateFor(s.ref, f, motionEMA);
 
-    if(holdMs >= HOLD && f){
-      // a bad pose that looks like the normal pose teaches us nothing
-      if(s.diff && refs.normal){
-        const moved = Math.abs(f.neck-refs.normal.neck) > 0.06 ||
-                      Math.abs(f.size-refs.normal.size)/refs.normal.size > 0.06 ||
-                      Math.abs(f.tilt-refs.normal.tilt) > 0.05;
-        if(!moved){
-          holdMs = 0;
-          $("wcue").textContent = "Too close to your normal pose - exaggerate it.";
-          return;
-        }
-      }
-      capture(f, s.ref);
-    }
+    // never let a fussy gate strand someone mid-demo
+    if(!g.ok && ok && f){ gateFailMs += dt; } else if(g.ok){ gateFailMs = 0; }
+    const relaxed = gateFailMs > 9000;
+
+    const pass = ok && !!f && (g.ok || relaxed);
+
+    if(pass) holdMs += dt;
+    else holdMs = Math.max(0, holdMs - dt);          // drains, so a wobble costs time not the whole hold
+
+    $("holdfill").style.width = `${clamp(holdMs/HOLD,0,1)*100}%`;
+    $("holdfill").classList.toggle("ready", pass);
+    $("wcue").classList.toggle("ok", pass);
+    $("wcue").textContent =
+      !ok      ? "Get your head and both shoulders in frame."
+      : relaxed && !g.ok ? "Close enough - just hold still."
+      : pass   ? "Hold it..."
+               : g.hint;
+
+    if(holdMs >= HOLD && f) capture(f, s.ref);
     return;
   }
 
@@ -440,6 +498,16 @@ function loop(){
 
   const ok = framing(smoothLm || []);
   const f  = smoothLm ? features(smoothLm) : null;
+
+  // how much the pose is moving right now, used to tell "settled" from "still moving"
+  if(f && prevFeat){
+    const m = Math.abs(f.neck-prevFeat.neck)
+            + Math.abs(f.tilt-prevFeat.tilt)
+            + Math.abs(f.off -prevFeat.off)
+            + Math.abs(f.size-prevFeat.size)/Math.max(f.size,1e-3);
+    motionEMA += (m*(33/Math.max(dt,1)) - motionEMA) * 0.25;
+  }
+  prevFeat = f;
   let col = "#ff7a2f";
 
   if(!live){

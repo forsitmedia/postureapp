@@ -54,7 +54,8 @@ body{
 .wcue.ok{background:rgba(61,220,151,.12);border-color:rgba(61,220,151,.35);color:var(--good)}
 
 .hold{height:8px;background:var(--panel2);border-radius:99px;overflow:hidden;margin:0 auto 14px;border:1px solid var(--line);max-width:420px}
-.holdfill{height:100%;width:0%;background:var(--accent);border-radius:99px;transition:width .1s linear}
+.holdfill{height:100%;width:0%;background:#6b625c;border-radius:99px;transition:width .1s linear,background .25s}
+.holdfill.ready{background:var(--good);box-shadow:0 0 14px rgba(61,220,151,.5)}
 
 .wframing{display:flex;gap:8px;justify-content:center;margin-bottom:14px;flex-wrap:wrap}
 .chip{font-size:11px;letter-spacing:.14em;text-transform:uppercase;padding:6px 12px;border-radius:99px;
