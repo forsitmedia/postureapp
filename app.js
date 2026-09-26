@@ -116,7 +116,6 @@ let goodMs=0, nagMoveMs=0, lastNagPos=null;
 let prevFeat=null, motionEMA=0, gateFailMs=0;
 let teaching=false, teachMs=0;
 let turnRange=0, sweepL=0, sweepR=0;
-let pipWin=null, pipEls=null;
 
 const HOLD = 2400, COOLDOWN = 1200;   // short re-arm; the nag clears itself on recovery
 const RECOVER_MS = 600;               // how long you must look good before it lets go
@@ -534,7 +533,6 @@ function goLive(){
 function backToWizard(fromIdx){
   live = false;
   if(alerting) hideNag();
-  closePip();
   const box = $("videobox");
   box.classList.add("fullscreen");
   document.body.appendChild(box);
@@ -554,73 +552,20 @@ function renderFaults(am, worst){
   }).join("");
 }
 
-/* ==================== floating window =====================
-   Document Picture-in-Picture needs a fresh user gesture, so it can
-   only be opened from a click - not later, when the user slouches.
-   The window therefore opens once on the click that starts tracking
-   and stays for the session, sitting dark and quiet until it is
-   needed. The real <video> element is MOVED into it rather than
-   copied, which is what carries its audio permission across; a fresh
-   element in that document would be refused and fall back to muted.
+/* ====================== audio priming =====================
+   Browsers refuse a programmatic play() with sound unless the media
+   element has been played once during a real user gesture. We play a
+   silent frame inside the click that starts tracking, which marks the
+   element as activated so every later alert can carry its audio.
    ========================================================= */
-const PIP_OK = typeof documentPictureInPicture !== "undefined";
-let warnVid = $("warnvid");          // keep a handle: the node moves between documents
-let pipIdle = null;
+const warnVid = $("warnvid");
 
-/* Playing once inside the click marks the element as user-activated,
-   so every later programmatic play is allowed to carry sound. */
 function primeAudio(){
   const v = warnVid, vol = v.volume;
   v.volume = 0;
   const p = v.play();
   if(p && p.then) p.then(()=>{ v.pause(); v.currentTime = 0; v.volume = vol; })
                    .catch(()=>{ v.volume = vol; });
-}
-
-async function openPip(){
-  if(!PIP_OK || pipWin || !$("pipOn").checked) return;
-  try{
-    pipWin = await documentPictureInPicture.requestWindow({width:320, height:220});
-  }catch(e){
-    $("pipHint").textContent = "Chrome refused the floating window. The in-page popup will be used.";
-    $("pipHint").classList.add("warn");
-    return;
-  }
-
-  const d = pipWin.document;
-  d.body.style.cssText = "margin:0;background:#0a0908;overflow:hidden;display:flex;"+
-    "flex-direction:column;height:100vh;font:12px/1.4 -apple-system,BlinkMacSystemFont,system-ui,sans-serif";
-
-  const idle = d.createElement("div");
-  idle.style.cssText = "flex:1;display:flex;align-items:center;justify-content:center;"+
-    "color:#4a433f;letter-spacing:.22em;text-transform:uppercase;font-size:10px";
-  idle.textContent = "watching";
-
-  const jeer = d.createElement("div");
-  jeer.style.cssText = "padding:8px 10px;background:#121110;color:#ff4d4d;font-weight:700;"+
-    "text-align:center;display:none";
-
-  warnVid.style.cssText = "flex:1;width:100%;object-fit:cover;background:#000;display:none";
-  d.body.append(idle, warnVid, jeer);
-  pipEls = {idle, jeer};
-  pipIdle = idle;
-
-  $("pipHint").textContent = "Floating on top. It stays dark until you shrimp.";
-  $("pipHint").classList.remove("warn");
-
-  pipWin.addEventListener("pagehide", ()=>{
-    // bring the player home so the in-page popup still works
-    const box = $("nag");
-    warnVid.style.cssText = "";
-    box.insertBefore(warnVid, box.firstChild);
-    pipWin = null; pipEls = null; pipIdle = null;
-    $("pipHint").textContent = "Floating window closed. Using the in-page popup.";
-  });
-}
-
-function closePip(){
-  if(!pipWin) return;
-  try{ pipWin.close(); }catch(e){}
 }
 
 /* ========================== nag =========================== */
@@ -653,39 +598,22 @@ function showNag(){
   $("stAlerts").textContent = alerts;
   $("warntext").textContent = JEERS[Math.floor(Math.random()*JEERS.length)];
 
+  const el = $("nag");
+  el.classList.remove("out");
+  el.hidden = false;
+  placeNag();
+
   warnVid.currentTime = 0;
   warnVid.muted = !$("soundOn").checked;
-
-  if(pipEls){
-    // floating window: wake it up
-    pipEls.idle.style.display = "none";
-    pipEls.jeer.style.display = "block";
-    pipEls.jeer.textContent = $("warntext").textContent;
-    warnVid.style.display = "block";
-  } else {
-    // in-page popup: lands somewhere new each time
-    const el = $("nag");
-    el.classList.remove("out");
-    el.hidden = false;
-    placeNag();
-  }
-
+  warnVid.volume = 1;
   warnVid.play().catch(()=>{ warnVid.muted = true; warnVid.play().catch(()=>{}); });
 }
 
 function hideNag(){
   warnVid.pause();
-
-  if(pipEls){
-    warnVid.style.display = "none";
-    pipEls.jeer.style.display = "none";
-    pipEls.idle.style.display = "flex";
-  } else {
-    const el = $("nag");
-    el.classList.add("out");
-    setTimeout(()=>{ el.hidden = true; }, 250);
-  }
-
+  const el = $("nag");
+  el.classList.add("out");
+  setTimeout(()=>{ el.hidden = true; }, 250);
   alerting = false; badMs = 0; goodMs = 0; cooldownMs = COOLDOWN;
 }
 
@@ -762,7 +690,7 @@ function loop(){
       else{
         goodMs = 0;
         nagMoveMs += dt;
-        if(!pipEls && nagMoveMs > 7000){ nagMoveMs = 0; placeNag(); }   // keep moving if ignored
+        if(nagMoveMs > 7000){ nagMoveMs = 0; placeNag(); }   // keep moving if ignored
       }
     } else if(!good){
       badMs += dt;                                      // counts during re-arm too
@@ -819,7 +747,7 @@ async function startCamera(){
 $("wPrimary").addEventListener("click", ()=>{
   const s = step();
   if(s.kind==="intro") startCamera();
-  else if(s.kind==="done"){ primeAudio(); goLive(); openPip(); }   // the click is the gesture both need
+  else if(s.kind==="done"){ primeAudio(); goLive(); }   // this click is the gesture audio needs
 });
 
 $("wSkip").addEventListener("click", ()=>{
