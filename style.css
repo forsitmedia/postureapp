@@ -107,6 +107,8 @@ h1 .ver{color:var(--dim);font-weight:500}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:17px}
 .panel h2{margin:0 0 12px;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);font-weight:700}
 
+.hint{color:var(--dim);margin:0 0 12px;font-size:13px}
+.hint.warn{color:var(--warn)}
 .diagnosis{font-size:17px;font-weight:700;margin-bottom:10px}
 .diagnosis.good{color:var(--good)}
 .diagnosis.bad{color:var(--bad)}
