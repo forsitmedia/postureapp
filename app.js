@@ -99,23 +99,23 @@ const STEPS = [
     body:"Now the other side. Drop your <b>right</b> shoulder.",
     cue:"Right shoulder down." },
 
-  { id:"t1", ready:"smile", teach:3000, img:"assets/tutorial/step1.png", kind:"tutorial", check:"elbowsIn", hold:2800,
+  { id:"t1", teach:6000, img:"assets/tutorial/step1.png", kind:"tutorial", check:"elbowsIn", hold:2800,
     title:"Elbows to your sides",
     body:"Elbows in until they <b>touch your sides</b>. Thumbs out.",
     cue:"Elbows in, thumbs out." },
 
-  { id:"t2", ready:"smile", teach:3000, img:"assets/tutorial/step2.png", kind:"tutorial", check:"rotateOut",
+  { id:"t2", teach:6000, img:"assets/tutorial/step2.png", kind:"tutorial", check:"rotateOut",
     hold:9000, holdText:"Keep rotating - hold it open.",
     title:"Rotate your thumbs out",
     body:"Elbows pinned. Rotate your thumbs outward <b>as far as they go</b>.",
     cue:"As far as you can. Elbows stay put." },
 
-  { id:"t3", ready:"smile", teach:3000, img:"assets/tutorial/step3.png", kind:"tutorial", check:"armsDown", hold:2800,
+  { id:"t3", teach:6000, img:"assets/tutorial/step3.png", kind:"tutorial", check:"armsDown", hold:2800,
     title:"Now drop your arms",
     body:"Let your arms fall. <b>Keep your chest where it is.</b>",
     cue:"Arms down. Chest stays open." },
 
-  { id:"ideal", ready:"smile", teach:3000, img:"assets/tutorial/step4.png", kind:"capture", ref:"ideal", relaxMs:9000, hold:2600,
+  { id:"ideal", teach:6000, img:"assets/tutorial/step4.png", kind:"capture", ref:"ideal", relaxMs:9000, hold:2600,
     title:"That's your position. Hold it.",
     body:"Hands back on the keyboard. Keep this position.",
     cue:"Shoulders level, chest open, head stacked." },
@@ -462,28 +462,14 @@ function wizardTick(f, ok, dt){
     // Steps that ask for a real body position wait for the user to say
     // they are ready by lifting a hand, rather than starting on a timer
     // they may not have finished reading.
-    if(s.ready === "smile"){
-      const r  = f ? f.mouth : 0;
-      const up = !!(f && mouthBase && r > mouthBase * 1.06);
-      $("wmetric").hidden = false;
-      $("wmetric").textContent = mouthBase
-        ? `smile ${(r/mouthBase).toFixed(2)}x / need 1.06x`
-        : "press start when you are ready";
-      $("wcue").hidden = false;
-      $("wcue").classList.toggle("ok", up);
-      $("wcue").textContent = up ? "Ready." : "Smile at the camera to start";
-      $("wSkip").hidden = false;
-      $("wSkip").textContent = "Start now";
-      teachMs = up ? teachMs + dt : 0;
-      if(teachMs < 400) return;          // brief hold, so a flicker does not count
-    } else {
-      teachMs += dt;
-      const left = Math.ceil((s.teach - teachMs)/1000);
-      $("wmetric").hidden = false;
-      $("wmetric").textContent = `get into this position - ${left}s`;
-    }
+    teachMs += dt;
+    const left = Math.ceil((s.teach - teachMs)/1000);
+    $("wmetric").hidden = false;
+    $("wmetric").textContent = `read this - starting in ${left}s`;
+    $("wSkip").hidden = false;
+    $("wSkip").textContent = "Start now";
 
-    if(s.ready === "smile" || teachMs >= s.teach){
+    if(teachMs >= s.teach){
       teaching = false;
       document.querySelector(".wcard").classList.remove("teaching");
       $("holdwrap").hidden = false;
