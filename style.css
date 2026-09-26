@@ -60,6 +60,8 @@ body{
 }
 .wcue.ok{background:rgba(61,220,151,.12);border-color:rgba(61,220,151,.35);color:var(--good)}
 
+.wmetric{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#6f6762;
+  font-variant-numeric:tabular-nums;margin:-6px 0 12px}
 .hold{height:8px;background:var(--panel2);border-radius:99px;overflow:hidden;margin:0 auto 14px;border:1px solid var(--line);max-width:420px}
 .holdfill{height:100%;width:0%;background:#6b625c;border-radius:99px;transition:width .1s linear,background .25s}
 .holdfill.ready{background:var(--good);box-shadow:0 0 14px rgba(61,220,151,.5)}

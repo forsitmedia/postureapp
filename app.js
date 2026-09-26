@@ -73,22 +73,23 @@ const STEPS = [
     body:"Same thing, mirrored. Drop your right shoulder and lean right.",
     cue:"Right shoulder down." },
 
-  { id:"t1", img:"assets/tutorial/step1.png", kind:"tutorial", check:"elbowsIn",
+  { id:"t1", img:"assets/tutorial/step1.png", kind:"tutorial", check:"elbowsIn", hold:2800,
     title:"Elbows to your sides",
     body:"Bring both elbows in until they're <b>touching your sides</b>. Thumbs pointing outward.",
     cue:"Elbows in, thumbs out." },
 
   { id:"t2", img:"assets/tutorial/step2.png", kind:"tutorial", check:"shouldersLevel",
+    hold:6000, holdText:"Keep rotating - hold it open.",
     title:"Rotate your thumbs out",
     body:"Keep your elbows pinned to your sides and rotate your thumbs outward <b>as far as they'll go</b>. Your shoulders will pull back and even out on their own.",
     cue:"As far as you can. Elbows stay put." },
 
-  { id:"t3", img:"assets/tutorial/step3.png", kind:"tutorial", check:"armsDown",
+  { id:"t3", img:"assets/tutorial/step3.png", kind:"tutorial", check:"armsDown", hold:2800,
     title:"Now drop your arms",
     body:"Let your arms fall loose, but <b>keep your chest and shoulders exactly where they are</b>.",
     cue:"Arms down. Chest stays open." },
 
-  { id:"ideal", img:"assets/tutorial/step4.png", kind:"capture", ref:"ideal", relaxMs:16000,
+  { id:"ideal", img:"assets/tutorial/step4.png", kind:"capture", ref:"ideal", relaxMs:14000, hold:2600,
     title:"That's your position. Hold it.",
     body:"Put your hands back on the keyboard and keep the chest and shoulders you just built. This is what we'll hold you to.",
     cue:"Shoulders level, chest open, head stacked." },
@@ -268,18 +269,21 @@ const GATES = {
                      : {ok:false, hint:"Drop your RIGHT shoulder."};
   },
 
-  // The target everything else is scored against, so this one is strict:
-  // it must be measurably better than the normal sit on every axis.
+  // The target everything else is scored against. Distance is deliberately
+  // NOT checked here: this pose is captured with hands on the keyboard, so
+  // reaching forward is expected. Height and level are what matter.
   ideal: (f,n,mo) => {
-    if(mo > 0.095)              return {ok:false, hint:"Hold still while we lock it in."};
-    if(f.size > n.size * 1.12)  return {ok:false, hint:"Sit back - you are leaning into the screen."};
-    if(f.size < n.size * 0.90)  return {ok:false, hint:"Come forward - you are slumped back."};
-    if(f.neck < n.neck * 1.03)  return {ok:false, hint:"Sit taller - lift your chest and lengthen your neck."};
-    if(Math.abs(f.tilt) > 0.06) return {ok:false, hint: f.tilt > 0
-                                          ? "Lift your LEFT shoulder - you are tipped over."
-                                          : "Lift your RIGHT shoulder - you are tipped over."};
-    if(Math.abs(f.off) > 0.13)  return {ok:false, hint:"Centre your head over your shoulders."};
-    return {ok:true, hint:"That is the one. Hold it."};
+    const h  = f.neck / Math.max(n.neck, 1e-3);
+    const lv = Math.abs(f.tilt);
+    const ct = Math.abs(f.off);
+    if(mo > 0.13)  return {ok:false, hint:"Hold still while we lock it in.", metric:`stillness ${mo.toFixed(2)} / 0.13`};
+    if(h < 1.02)   return {ok:false, hint:"Sit taller - lift your chest and lengthen your neck.", metric:`height ${h.toFixed(2)}x / need 1.02x`};
+    if(lv > 0.075) return {ok:false, hint: f.tilt > 0
+                             ? "Lift your LEFT shoulder - you are tipped over."
+                             : "Lift your RIGHT shoulder - you are tipped over.",
+                           metric:`tilt ${lv.toFixed(3)} / max 0.075`};
+    if(ct > 0.15)  return {ok:false, hint:"Centre your head over your shoulders.", metric:`offset ${ct.toFixed(2)} / max 0.15`};
+    return {ok:true, hint:"That is the one. Hold it.", metric:`height ${h.toFixed(2)}x  tilt ${lv.toFixed(3)}`};
   }
 };
 
@@ -314,6 +318,8 @@ function showStep(){
   $("wstep").textContent = `Step ${stepIdx+1} of ${STEPS.length}`;
   $("wtitle").textContent = s.title;
   $("wbody").innerHTML = s.body;
+
+  $("wmetric").hidden = true;
 
   const img = $("wimg");
   img.hidden = !s.img;
@@ -365,6 +371,7 @@ function wizardTick(f, ok, dt){
   }
 
   if(s.kind==="capture"){
+    const need = s.hold || HOLD;
     const g = gateFor(s.ref, f, motionEMA);
 
     // never let a fussy gate strand someone mid-demo
@@ -376,31 +383,39 @@ function wizardTick(f, ok, dt){
     if(pass) holdMs += dt;
     else holdMs = Math.max(0, holdMs - dt);          // drains, so a wobble costs time not the whole hold
 
-    $("holdfill").style.width = `${clamp(holdMs/HOLD,0,1)*100}%`;
+    $("holdfill").style.width = `${clamp(holdMs/need,0,1)*100}%`;
     $("holdfill").classList.toggle("ready", pass);
     $("wcue").classList.toggle("ok", pass);
     $("wcue").textContent =
       !ok      ? "Get your head and both shoulders in frame."
       : relaxed && !g.ok ? "Close enough - just hold still."
-      : pass   ? "Hold it..."
+      : pass   ? `Hold it... ${Math.ceil((need-holdMs)/1000)}s`
                : g.hint;
+    $("wmetric").hidden = !g.metric || !ok;
+    if(g.metric) $("wmetric").textContent = g.metric;
 
-    if(holdMs >= HOLD && f) capture(f, s.ref);
+    if(holdMs >= need && f) capture(f, s.ref);
     return;
   }
 
   if(s.kind==="tutorial"){
+    const need = s.hold || HOLD;
     const pass = f ? CHECKS[s.check](f) : false;
     if(pass) holdMs += dt; else holdMs = Math.max(0, holdMs - dt);
-    $("holdfill").style.width = `${clamp(holdMs/HOLD,0,1)*100}%`;
+    $("holdfill").style.width = `${clamp(holdMs/need,0,1)*100}%`;
+    $("holdfill").classList.toggle("ready", pass);
     $("wcue").classList.toggle("ok", pass);
     if(!pass){
       tutorialHint += dt;
-      if(tutorialHint > 2500) $("wcue").textContent = CHECK_HINT[s.check];
+      if(tutorialHint > 2000) $("wcue").textContent = CHECK_HINT[s.check];
+      $("wmetric").hidden = true;
     } else {
-      $("wcue").textContent = "That's it. Hold.";
+      const left = Math.ceil((need-holdMs)/1000);
+      $("wcue").textContent = s.holdText || "That's it. Hold.";
+      $("wmetric").hidden = false;
+      $("wmetric").textContent = `${left}s`;
     }
-    if(holdMs >= HOLD) nextStep();
+    if(holdMs >= need) nextStep();
   }
 }
 
